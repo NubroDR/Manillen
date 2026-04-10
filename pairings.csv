@@ -1,5 +1,7 @@
 Player1,Player2,Count
+Bruno,J.-P.,0
 Bruno,José,1
+Bruno,Katrien,0
 Bruno,Pascal,1
 Bruno,Zoë,1
 Etienne,Gildon,1
@@ -8,6 +10,8 @@ Etienne,Robby,1
 Freddy,Frederik,1
 Freddy,Marc,1
 Freddy,Matthias,1
+Frederik,Jeffrey,0
+Frederik,Kristien,0
 Frederik,Marc,1
 Frederik,Matthias,1
 Gilbert,Kirsten,1
@@ -15,6 +19,8 @@ Gilbert,Kristien,1
 Gilbert,Peter,1
 Gildon,Martine,1
 Gildon,Robby,1
+J.-P.,Katrien,0
+Jeffrey,Kristien,0
 José,Pascal,1
 José,Zoë,1
 Kirsten,Kristien,1

@@ -1,6 +1,7 @@
 import csv
 import itertools as it
 from collections import defaultdict
+from datetime import date
 
 def load_all_players(csv_filename):
     """
@@ -55,6 +56,31 @@ def load_pair_counts(csv_filename):
     except FileNotFoundError:
         pass
     return pair_counts
+
+
+def save_pairings_history(config, play_date=None, history_filename='pairings_history.csv'):
+    """Save a table pairing configuration to a history CSV file."""
+    if play_date is None:
+        play_date = date.today().isoformat()
+    elif isinstance(play_date, date):
+        play_date = play_date.isoformat()
+
+    file_exists = False
+    try:
+        with open(history_filename, 'r', encoding='utf-8') as _:
+            file_exists = True
+    except FileNotFoundError:
+        pass
+
+    with open(history_filename, 'a', encoding='utf-8', newline='') as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(['Date', 'Table', 'Players'])
+        for table_number, group in enumerate(config, start=1):
+            writer.writerow([play_date, table_number, ' | '.join(group)])
+
+    print(f"Saved pairing history to {history_filename} for date {play_date}")
+
 
 def score_group(group, pair_counts):
     """
@@ -234,11 +260,12 @@ def make_groups_simple_greedy(pool, group_size, csv_filename):
     return [(max_pair_count, sorted_config)]
 
 
-def update_pairs_in_csv(config, csv_filename):
+def update_pairs_in_csv(config, csv_filename, history_filename=None, play_date=None):
     """
     Update CSV with pairs from the chosen configuration.
     Each group of 4 players generates 6 pairs.
     Skips pairs that include Reserve players.
+    Optionally writes the chosen configuration to a history file.
     """
     # Load existing counts
     pair_counts = load_pair_counts(csv_filename)
@@ -261,5 +288,65 @@ def update_pairs_in_csv(config, csv_filename):
         writer.writerow(['Player1', 'Player2', 'Count'])  # Header
         for (p1, p2), count in sorted(pair_counts.items()):
             writer.writerow([p1, p2, count])
-    
-    print(f"✓ Updated {csv_filename} with {pairs_added} pairs (Reserve pairs excluded)")
+
+    if history_filename:
+        save_pairings_history(config, play_date=play_date, history_filename=history_filename)
+
+    print(f"Updated {csv_filename} with {pairs_added} pairs (Reserve pairs excluded)")
+
+
+def delete_pairings_by_date(play_date, csv_filename='pairings.csv', history_filename='pairings_history.csv'):
+    """Delete pairings for a given play date from history and decrement counts."""
+    history_rows = []
+    removed_rows = []
+
+    try:
+        with open(history_filename, 'r', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            header = next(reader, None)
+            if header is None:
+                print(f"No history found in {history_filename}.")
+                return []
+            for row in reader:
+                if len(row) < 3:
+                    continue
+                row_date = row[0].strip()
+                if row_date == play_date:
+                    removed_rows.append([row_date, row[1].strip(), row[2].strip()])
+                else:
+                    history_rows.append(row)
+    except FileNotFoundError:
+        print(f"Warning: History file '{history_filename}' not found.")
+        return []
+
+    if not removed_rows:
+        print(f"No pairings found for date {play_date} in {history_filename}.")
+        return []
+
+    # Load current pair counts and decrement for removed tables
+    pair_counts = load_pair_counts(csv_filename)
+    for _, _, players in removed_rows:
+        participants = [p.strip() for p in players.split('|') if p.strip()]
+        for pair in it.combinations(participants, 2):
+            # Skip pairs with Reserve players, same as when adding pairs
+            if any('Reserve' in player for player in pair):
+                continue
+            pair_key = tuple(sorted(pair))
+            current_count = pair_counts.get(pair_key, 0)
+            pair_counts[pair_key] = max(0, current_count - 1)
+
+    # Write updated pair counts back to CSV
+    with open(csv_filename, 'w', encoding='utf-8', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['Player1', 'Player2', 'Count'])
+        for (p1, p2), count in sorted(pair_counts.items()):
+            writer.writerow([p1, p2, count])
+
+    # Write updated history file without removed date entries
+    with open(history_filename, 'w', encoding='utf-8', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        writer.writerows(history_rows)
+
+    print(f"Deleted pairings for date {play_date} from {history_filename} and updated {csv_filename}.")
+    return removed_rows

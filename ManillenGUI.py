@@ -1,74 +1,10 @@
 #ManillenGUI
+import time
 import ipywidgets as widgets
-from IPython.display import display
+from IPython.display import display, clear_output
 
 import tkinter as tk
 from tkinter import ttk
-
-def create_player_selector(all_players):
-    """
-    Create an interactive GUI for selecting active players.
-    Returns a widget that you can use to get selected players.
-    """
-    # Create checkboxes for each player (all checked by default)
-    checkboxes = [
-        widgets.Checkbox(value=True, description=player, indent=False)
-        for player in all_players
-    ]
-    
-    # Select All / Deselect All buttons
-    select_all_btn = widgets.Button(description="Select All", button_style='success')
-    deselect_all_btn = widgets.Button(description="Deselect All", button_style='warning')
-    
-    def select_all(b):
-        for cb in checkboxes:
-            cb.value = True
-    
-    def deselect_all(b):
-        for cb in checkboxes:
-            cb.value = False
-    
-    select_all_btn.on_click(select_all)
-    deselect_all_btn.on_click(deselect_all)
-    
-    # Layout
-    buttons = widgets.HBox([select_all_btn, deselect_all_btn])
-    checkbox_container = widgets.VBox(checkboxes)
-    
-    # Count display
-    count_label = widgets.Label(value=f"Selected: {len(all_players)} players")
-    
-    def update_count(*args):
-        selected = sum(1 for cb in checkboxes if cb.value)
-        count_label.value = f"Selected: {selected} players"
-    
-    for cb in checkboxes:
-        cb.observe(update_count, 'value')
-    
-    # Complete interface
-    interface = widgets.VBox([
-        widgets.HTML("<h3>Select Active Players</h3>"),
-        buttons,
-        count_label,
-        checkbox_container
-    ])
-    
-    # Function to get selected players
-    def get_selected_players():
-        return [cb.description for cb in checkboxes if cb.value]
-    
-    interface.get_selected_players = get_selected_players
-    
-    return interface
-
-
-# Usage example:
-# AllPlayers = ["Marc", "Peter", "Freddy", "Zoë", ...]
-# selector = create_player_selector(AllPlayers)
-# display(selector)
-# 
-# # Later, get the selected players:
-# ActivePlayers = selector.get_selected_players()
 
 
 def create_player_selector_window(all_players):
@@ -182,7 +118,111 @@ def create_player_selector_window(all_players):
     return selected_players
 
 
+def create_player_selector_widget(all_players):
+    """Create an IPython widget selector for active players."""
+    all_players = sorted(all_players)
+    selected = []  # default: all players available, none selected
+
+    filter_text = widgets.Text(
+        description='Filter:',
+        placeholder='Type to search players...',
+        layout=widgets.Layout(width='100%')
+    )
+
+    available_list = widgets.SelectMultiple(
+        options=tuple(p for p in all_players if p not in selected),
+        rows=18,
+        description='Available',
+        layout=widgets.Layout(width='38%')
+    )
+
+    selected_list = widgets.SelectMultiple(
+        options=tuple(selected),
+        rows=18,
+        description='Selected',
+        layout=widgets.Layout(width='38%')
+    )
+
+    add_btn = widgets.Button(description='Add ->', button_style='success', layout=widgets.Layout(width='100%'))
+    remove_btn = widgets.Button(description='<- Remove', button_style='warning', layout=widgets.Layout(width='100%'))
+    select_all_btn = widgets.Button(description='Select All', button_style='info', layout=widgets.Layout(width='100%'))
+    deselect_all_btn = widgets.Button(description='Deselect All', button_style='danger', layout=widgets.Layout(width='100%'))
+    confirm_btn = widgets.Button(description='Confirm Selection', button_style='primary', layout=widgets.Layout(width='100%'))
+    status = widgets.HTML(value=f'<b>Selected:</b> {len(selected)} / {len(all_players)}')
+
+    selected_players = []
+
+    def update_lists():
+        filtered = [p for p in all_players if filter_text.value.lower() in p.lower() and p not in selected]
+        available_list.options = tuple(filtered)
+        selected_list.options = tuple(selected)
+        available_list.value = ()
+        selected_list.value = ()
+        status.value = f'<b>Selected:</b> {len(selected)} / {len(all_players)}'
+
+    def add_selected(_=None):
+        for player in available_list.value:
+            if player not in selected:
+                selected.append(player)
+        selected.sort()
+        update_lists()
+
+    def remove_selected(_=None):
+        for player in selected_list.value:
+            if player in selected:
+                selected.remove(player)
+        update_lists()
+
+    def select_all(_=None):
+        selected[:] = all_players[:]
+        selected.sort()
+        update_lists()
+
+    def deselect_all(_=None):
+        selected.clear()
+        update_lists()
+
+    def on_filter_change(change):
+        update_lists()
+
+    def confirm(_=None):
+        selected_players.clear()
+        selected_players.extend(selected)
+        status.value = '<b>Selection confirmed.</b>'
+        add_btn.disabled = True
+        remove_btn.disabled = True
+        select_all_btn.disabled = True
+        deselect_all_btn.disabled = True
+        filter_text.disabled = True
+
+    filter_text.observe(on_filter_change, names='value')
+    add_btn.on_click(add_selected)
+    remove_btn.on_click(remove_selected)
+    select_all_btn.on_click(select_all)
+    deselect_all_btn.on_click(deselect_all)
+    confirm_btn.on_click(confirm)
+
+    move_box = widgets.VBox(
+        [add_btn, remove_btn, select_all_btn, deselect_all_btn],
+        layout=widgets.Layout(width='20%', min_width='120px')
+    )
+    lists_box = widgets.HBox(
+        [available_list, move_box, selected_list],
+        layout=widgets.Layout(align_items='center', width='100%')
+    )
+    main_box = widgets.VBox(
+        [filter_text, lists_box, status, confirm_btn],
+        layout=widgets.Layout(width='100%', min_height='300px')
+    )
+
+    display(main_box)
+
+    return selected_players
+
+
 # Usage example:
 # AllPlayers = ["Marc", "Peter", "Freddy", "Zoë", ...]
 # ActivePlayers = create_player_selector_window(AllPlayers)
+# print(f"Selected: {ActivePlayers}")
+# ActivePlayers = create_player_selector_widget(AllPlayers)
 # print(f"Selected: {ActivePlayers}")
