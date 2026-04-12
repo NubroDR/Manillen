@@ -1,7 +1,12 @@
 import csv
 import itertools as it
+import shutil
 from collections import defaultdict
 from datetime import date
+from pathlib import Path
+
+from openpyxl import load_workbook
+
 
 def load_all_players(csv_filename):
     """
@@ -80,6 +85,188 @@ def save_pairings_history(config, play_date=None, history_filename='pairings_his
             writer.writerow([play_date, table_number, ' | '.join(group)])
 
     print(f"Saved pairing history to {history_filename} for date {play_date}")
+
+
+SCOREBLAD_DATE_CELLS = ('C2', 'I2', 'O2', 'U2')
+SCOREBLAD_NAME_BLOCKS = [
+    ('B10', 'E10', 'B19', 'E19'),
+    ('H10', 'K10', 'H19', 'K19'),
+    ('N10', 'Q10', 'N19', 'Q19'),
+    ('T10', 'W10', 'T19', 'W19'),
+]
+
+
+def _normalize_play_date(play_date):
+    if play_date is None:
+        return date.today()
+    if isinstance(play_date, date):
+        return play_date
+    if isinstance(play_date, str):
+        try:
+            return date.fromisoformat(play_date)
+        except ValueError:
+            pass
+        if len(play_date) == 8 and play_date.isdigit():
+            return date.fromisoformat(
+                f"{play_date[:4]}-{play_date[4:6]}-{play_date[6:]}"
+            )
+    raise ValueError('play_date must be a date or string in YYYY-MM-DD / YYYYMMDD format')
+
+
+def _clear_scoreblad_sheet(ws):
+    for cell in SCOREBLAD_DATE_CELLS:
+        ws[cell].value = None
+    for block in SCOREBLAD_NAME_BLOCKS:
+        for cell in block:
+            ws[cell].value = None
+
+
+def _load_pairings_history(play_date=None, history_filename='pairings_history.csv'):
+    """Load pairings for a given date from pairings_history.csv."""
+    play_date = _normalize_play_date(play_date).isoformat()
+    pairings_by_table = {}
+
+    try:
+        with open(history_filename, 'r', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            next(reader, None)
+            for row in reader:
+                if len(row) < 3:
+                    continue
+                row_date = row[0].strip()
+                if row_date != play_date:
+                    continue
+                try:
+                    table_number = int(row[1])
+                except ValueError:
+                    continue
+                if table_number < 1 or table_number > 4:
+                    raise ValueError(f'Invalid table number {table_number} in history')
+                if table_number in pairings_by_table:
+                    raise ValueError(f'Duplicate table entry for table {table_number} on {play_date}')
+                players = [p.strip() for p in row[2].split('|') if p.strip()]
+                if len(players) != 4:
+                    raise ValueError(
+                        f'Expected 4 players for table {table_number} on {play_date}, got {len(players)}'
+                    )
+                pairings_by_table[table_number] = players
+    except FileNotFoundError:
+        raise FileNotFoundError(f'History file not found: {history_filename}')
+
+    if not pairings_by_table:
+        raise ValueError(f'No pairings found for date {play_date} in {history_filename}')
+
+    return [pairings_by_table[key] for key in sorted(pairings_by_table)]
+
+
+def _get_reserve_substitutions(reserve1=None, reserve2=None, reserve3=None):
+    return {
+        'Reserve 1': reserve1.strip() if isinstance(reserve1, str) and reserve1.strip() else None,
+        'Reserve 2': reserve2.strip() if isinstance(reserve2, str) and reserve2.strip() else None,
+        'Reserve 3': reserve3.strip() if isinstance(reserve3, str) and reserve3.strip() else None,
+    }
+
+
+def fill_scorebladen_from_history(
+    play_date=None,
+    history_filename='pairings_history.csv',
+    template_filename='Scorebladen.xlsx',
+    output_dir=None,
+    reserve1=None,
+    reserve2=None,
+    reserve3=None,
+):
+    """Fill scorebladen from a past pairing history date."""
+    pairings = _load_pairings_history(play_date, history_filename)
+    return fill_scorebladen(
+        pairings,
+        play_date=play_date,
+        template_filename=template_filename,
+        output_dir=output_dir,
+        reserve1=reserve1,
+        reserve2=reserve2,
+        reserve3=reserve3,
+    )
+
+
+def fill_scorebladen(
+    pairings,
+    play_date=None,
+    template_filename='Scorebladen.xlsx',
+    output_dir=None,
+    reserve1=None,
+    reserve2=None,
+    reserve3=None,
+):
+    """Fill the Excel scorebladen template based on the given table pairings.
+
+    pairings: list of 4-player groups, one group per table.
+    play_date: date or string; written into the date cells of each used sheet.
+    template_filename: Excel template to read.
+    output_dir: optional directory where the filled copy is saved.
+    reserve1/reserve2/reserve3: optional substitute names for placeholders Reserve 1/2/3.
+
+    Returns the output file path as a string.
+    """
+    play_date = _normalize_play_date(play_date)
+    template_path = Path(template_filename)
+    if not template_path.exists():
+        raise FileNotFoundError(f"Template file not found: {template_path}")
+
+    if not isinstance(pairings, (list, tuple)):
+        raise ValueError('pairings must be a list or tuple of table groups')
+
+    table_count = len(pairings)
+    if table_count < 1 or table_count > 4:
+        raise ValueError('pairings must contain between 1 and 4 tables')
+
+    reserve_substitutions = _get_reserve_substitutions(reserve1, reserve2, reserve3)
+
+    default_output_dir = template_path.parent / 'Scorebladen'
+    output_dir = Path(output_dir) if output_dir else default_output_dir
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_filename = f"scorebladen{play_date.strftime('%Y%m%d')}.xlsx"
+    output_path = output_dir / output_filename
+    shutil.copy(template_path, output_path)
+
+    wb = load_workbook(output_path)
+
+    for table_index in range(4):
+        sheet_name = f'Tafel {table_index + 1}'
+        if sheet_name not in wb.sheetnames:
+            raise ValueError(f"Expected sheet '{sheet_name}' in template")
+        ws = wb[sheet_name]
+        _clear_scoreblad_sheet(ws)
+
+        if table_index >= table_count:
+            continue
+
+        group = pairings[table_index]
+        if not isinstance(group, (list, tuple)) or len(group) != 4:
+            raise ValueError('Each table grouping must be a list or tuple of 4 player names')
+        players = [str(player) for player in group]
+
+        for cell in SCOREBLAD_DATE_CELLS:
+            ws[cell].value = play_date
+
+        # Write the three unique 2v2 matchups
+        matchups = [
+            (players[0], players[1], players[2], players[3]),
+            (players[0], players[2], players[1], players[3]),
+            (players[0], players[3], players[1], players[2]),
+        ]
+
+        for block, matchup in zip(SCOREBLAD_NAME_BLOCKS, matchups):
+            for cell, player in zip(block, matchup):
+                if player in reserve_substitutions:
+                    ws[cell].value = reserve_substitutions[player]
+                else:
+                    ws[cell].value = player
+
+    wb.save(output_path)
+
+    print(f"Saved filled scorebladen to {output_path}")
+    return str(output_path)
 
 
 def score_group(group, pair_counts):
