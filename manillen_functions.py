@@ -88,11 +88,13 @@ def save_pairings_history(config, play_date=None, history_filename='pairings_his
 
 
 SCOREBLAD_DATE_CELLS = ('C2', 'I2', 'O2', 'U2')
+# Each name block is laid out as two vertical team columns:
+# left-team-top, left-team-bottom, right-team-top, right-team-bottom
 SCOREBLAD_NAME_BLOCKS = [
-    ('B10', 'E10', 'B19', 'E19'),
-    ('H10', 'K10', 'H19', 'K19'),
-    ('N10', 'Q10', 'N19', 'Q19'),
-    ('T10', 'W10', 'T19', 'W19'),
+    ('B10', 'B19', 'E10', 'E19'),
+    ('H10', 'H19', 'K10', 'K19'),
+    ('N10', 'N19', 'Q10', 'Q19'),
+    ('T10', 'T19', 'W10', 'W19'),
 ]
 
 
@@ -315,7 +317,7 @@ def make_groups_greedy(pool, group_size, csv_filename, max_configs=20):
         
         while remaining:
             best_group = None
-            best_score = float('inf')
+            best_key = None
             
             # Try combinations prioritizing low pair counts
             attempts = 0
@@ -329,17 +331,23 @@ def make_groups_greedy(pool, group_size, csv_filename, max_configs=20):
                 if reserve_count > 1:
                     continue
                 
-                # Score = MAX pair count in this group (worst pairing)
+                group_pairs = tuple(it.combinations(group, 2))
                 group_score = score_group(group, pair_counts)
+                group_sum = sum(pair_counts.get(tuple(sorted(pair)), 0) for pair in group_pairs)
+                group_repeat_count = sum(
+                    1 for pair in group_pairs
+                    if pair_counts.get(tuple(sorted(pair)), 0) > 0
+                )
                 
                 # Penalize reusing pairs within this config
-                pairs_in_group = set(tuple(sorted(pair)) 
-                                    for pair in it.combinations(group, 2))
+                pairs_in_group = set(tuple(sorted(pair)) for pair in group_pairs)
                 overlap = len(pairs_in_group & used_pairs)
-                adjusted_score = group_score + (overlap * 100)  # Heavy penalty
                 
-                if adjusted_score < best_score:
-                    best_score = adjusted_score
+                # Primary objective: minimize worst pair count.
+                # Secondary objective: minimize repeated pairs and total pair counts.
+                key = (group_score, overlap, group_repeat_count, group_sum)
+                if best_key is None or key < best_key:
+                    best_key = key
                     best_group = group
             
             if best_group is None:
@@ -355,26 +363,31 @@ def make_groups_greedy(pool, group_size, csv_filename, max_configs=20):
             sorted_config = [tuple(sorted(g)) for g in config]
             
             # Calculate overall MAX score (worst pair in entire config)
-            # Only consider pairs without Reserve players
+            # Also compute secondary tie-breakers for equivalent max scores.
             max_pair_count = 0
+            total_pair_sum = 0
+            total_repeat_count = 0
             for group in sorted_config:
-                # Only count pairs without Reserve players
                 group_pairs = [pair for pair in it.combinations(group, 2)
                               if not any("Reserve" in p for p in pair)]
                 if group_pairs:
-                    # Max pair count in this group
-                    group_max = max(pair_counts.get(tuple(sorted(pair)), 0) 
+                    group_max = max(pair_counts.get(tuple(sorted(pair)), 0)
                                    for pair in group_pairs)
-                    # Track the overall maximum across all groups
                     max_pair_count = max(max_pair_count, group_max)
+                    total_pair_sum += sum(pair_counts.get(tuple(sorted(pair)), 0)
+                                          for pair in group_pairs)
+                    total_repeat_count += sum(
+                        1 for pair in group_pairs
+                        if pair_counts.get(tuple(sorted(pair)), 0) > 0
+                    )
             
             # Score = worst pair count in entire configuration
-            configs.append((max_pair_count, sorted_config))
+            configs.append((max_pair_count, total_repeat_count, total_pair_sum, sorted_config))
     
-    # Remove duplicates and sort by maximum pair count (lowest first)
+    # Remove duplicates and sort by maximum pair count (lowest first), then by repeat count and sum.
     unique_configs = []
     seen = set()
-    for score, config in sorted(configs, key=lambda x: x[0]):
+    for score, repeat_count, total_sum, config in sorted(configs, key=lambda x: (x[0], x[1], x[2])):
         # Create hashable representation
         config_key = tuple(sorted(tuple(sorted(g)) for g in config))
         if config_key not in seen:
