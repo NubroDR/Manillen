@@ -15,6 +15,7 @@ from manillen_functions import (
     make_groups_greedy,
     update_pairs_in_csv,
 )
+from score_functions import compute_standings, get_matchups_for_table, load_scores, save_scores
 
 
 # Keep these paths aligned with the notebook so both workflows share the data.
@@ -24,6 +25,7 @@ ALL_PLAYERS_FILE = BASE_DIR / "AllPlayers.csv"
 HISTORY_FILE = BASE_DIR / "pairings_history.csv"
 SCOREBLAD_TEMPLATE = BASE_DIR / "Scorebladen.xlsx"
 SCOREBLAD_OUTPUT_DIR = BASE_DIR / "Scorebladen"
+SCORES_FILE = BASE_DIR / "scores_history.csv"
 
 
 def _history_dates():
@@ -93,6 +95,60 @@ def _pairings_table(selected_player=None):
         ),
         ui.tags.tbody(*table_rows),
         class_="pairings-table",
+    )
+
+
+def _score_input_id(table, game, team):
+    return f"score_t{table}_g{game}_{team}"
+
+
+def _score_entry_tables(play_date):
+    history = _read_history().get(play_date, [])
+    existing = {
+        (row["Table"], row["Game"]): row
+        for row in load_scores(str(SCORES_FILE), play_date)
+    }
+    if not history:
+        return ui.div("Geen tafels gevonden voor deze speeldag.", class_="empty-state")
+
+    sections = []
+    for table_text, table_players in history:
+        table = int(table_text)
+        games = []
+        for game, (team1, team2) in enumerate(get_matchups_for_table(table_players), start=1):
+            row = existing.get((table, game), {})
+            games.append(
+                ui.div(
+                    ui.div(f"Spel {game}", class_="score-game-title"),
+                    ui.div(" + ".join(team1), class_="score-team"),
+                    ui.input_numeric(_score_input_id(table, game, "team1"), "Team 1", value=row.get("Team1Score")),
+                    ui.div("vs", class_="score-vs"),
+                    ui.input_numeric(_score_input_id(table, game, "team2"), "Team 2", value=row.get("Team2Score")),
+                    ui.div(" + ".join(team2), class_="score-team"),
+                    class_="score-game",
+                )
+            )
+        sections.append(ui.div(ui.h3(f"Tafel {table}"), ui.div(*games), class_="score-table-card"))
+    return ui.div(*sections, class_="score-tables")
+
+
+def _standings_table(play_date=None):
+    rows = compute_standings(str(SCORES_FILE), play_date)
+    if not rows:
+        return ui.div("Nog geen scores ingevoerd.", class_="empty-state")
+    return ui.tags.table(
+        ui.tags.thead(ui.tags.tr(
+            ui.tags.th("#"), ui.tags.th("Speler"), ui.tags.th("Gewonnen"),
+            ui.tags.th("Gespeeld"), ui.tags.th("Voor"), ui.tags.th("Tegen"), ui.tags.th("Saldo")
+        )),
+        ui.tags.tbody(*[
+            ui.tags.tr(
+                ui.tags.td(str(index)), ui.tags.td(row["player"]), ui.tags.td(str(row["wins"])),
+                ui.tags.td(str(row["games_played"])), ui.tags.td(str(row["points_for"])),
+                ui.tags.td(str(row["points_against"])), ui.tags.td(str(row["point_diff"]), class_="pair-count")
+            ) for index, row in enumerate(rows, start=1)
+        ]),
+        class_="pairings-table standings-table",
     )
 
 
@@ -260,6 +316,8 @@ app_ui = ui.page_fluid(
             .history-tables { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:10px; } .history-table { border-left:3px solid var(--gold); padding:10px 12px; background:#fffaf0; }
             .history-players { color:var(--muted); } .danger-button { color:var(--red); border-color:#dfaaa4; background:transparent; } .empty-state { color:var(--muted); padding:18px 0; }
             .pairings-table { width:100%; border-collapse:collapse; background:var(--panel); } .pairings-table th, .pairings-table td { text-align:left; padding:11px 13px; border-bottom:1px solid var(--line); } .pairings-table th { color:var(--teal); font-family:'Space Grotesk'; } .pairings-table .pair-count { font-weight:700; text-align:right; } .pairings-table th:last-child { text-align:right; }
+            .score-table-card { border-top:1px solid var(--line); padding:20px 0; } .score-table-card h3 { margin-top:0; } .score-game { display:grid; grid-template-columns:70px minmax(140px,1fr) 100px 32px 100px minmax(140px,1fr); align-items:center; gap:12px; padding:12px; background:#fffaf0; margin:8px 0; } .score-game .form-group { margin:0; } .score-game-title { font-family:'Space Grotesk'; font-weight:700; } .score-team { font-weight:500; } .score-vs { color:var(--muted); text-align:center; font-weight:700; } .score-warning { color:#805d1d; background:#fff0cf; padding:9px 12px; margin-top:12px; } .score-error { color:#7e2f2a; background:#f8e7e3; padding:10px 12px; margin:12px 0; }
+            @media (max-width:760px) { .score-game { grid-template-columns:1fr 1fr; } .score-game-title { grid-column:1 / -1; } .score-vs { display:none; } }
             @media (max-width:600px) { .app-shell { padding:28px 14px 50px; } .panel { padding:17px; } .history-header { align-items:flex-start; flex-direction:column; } }
             """
         )
@@ -307,6 +365,27 @@ app_ui = ui.page_fluid(
             ),
         ),
         ui.nav_panel(
+            "Scores invoeren",
+            ui.div(
+                ui.h2("Scores invoeren"),
+                ui.input_select("score_entry_date", "Speeldag", history_choices or {"": "Geen historiek beschikbaar"}),
+                ui.output_ui("score_entry_tables"),
+                ui.output_ui("score_validation"),
+                ui.input_action_button("save_scores", "Scores opslaan", class_="btn-success"),
+                ui.output_ui("score_entry_status"),
+                class_="panel",
+            ),
+        ),
+        ui.nav_panel(
+            "Tussenstand",
+            ui.div(
+                ui.h2("Tussenstand"),
+                ui.input_select("standings_date", "Periode", {"": "Alle speeldagen (cumulatief)", **{item: item for item in history_choices}}),
+                ui.output_ui("standings"),
+                class_="panel",
+            ),
+        ),
+        ui.nav_panel(
             "Geschiedenis",
             ui.div(ui.h2("Gespeelde dagen"), ui.output_ui("history"), class_="panel"),
         ),
@@ -333,13 +412,15 @@ app_ui = ui.page_fluid(
 
 
 def server(input: Inputs, output: Outputs, session: Session):
-    configuration_state = reactive.Value([])
-    selected_config = reactive.Value(None)
-    generation_message = reactive.Value(None)
-    scoreblad_path = reactive.Value(None)
+    configuration_state = reactive.Value[list[tuple[int, list[tuple[str, ...]]]]]([])
+    selected_config = reactive.Value[int | None](None)
+    generation_message = reactive.Value[tuple[str, str] | None](None)
+    scoreblad_path = reactive.Value[str | None](None)
     history_refresh = reactive.Value(0)
-    delete_clicks = reactive.Value({})
-    pending_delete = reactive.Value(None)
+    score_refresh = reactive.Value(0)
+    score_message = reactive.Value[tuple[str, str] | None](None)
+    delete_clicks = reactive.Value[dict[str, int]]({})
+    pending_delete = reactive.Value[str | None](None)
 
     @reactive.effect
     @reactive.event(input.generate)
@@ -440,6 +521,72 @@ def server(input: Inputs, output: Outputs, session: Session):
     def pairings():
         history_refresh()
         return _pairings_table(input.pairing_player() or None)
+
+    @render.ui
+    def score_entry_tables():
+        history_refresh()
+        score_refresh()
+        return _score_entry_tables(input.score_entry_date())
+
+    @render.ui
+    def score_validation():
+        history_refresh()
+        warnings = []
+        for table_text, _ in _read_history().get(input.score_entry_date(), []):
+            table = int(table_text)
+            for game in range(1, 4):
+                team1 = getattr(input, _score_input_id(table, game, "team1"))()
+                team2 = getattr(input, _score_input_id(table, game, "team2"))()
+                if team1 is not None and team2 is not None and team1 < 101 and team2 < 101:
+                    warnings.append(f"Tafel {table}, spel {game}: geen van beide scores is 101 of hoger.")
+        if not warnings:
+            return ui.HTML("")
+        return ui.div(*warnings, class_="score-warning")
+
+    @reactive.effect
+    @reactive.event(input.save_scores)
+    def save_all_scores():
+        play_date = input.score_entry_date()
+        history = _read_history().get(play_date, [])
+        try:
+            all_table_scores = []
+            for table_text, table_players in history:
+                table = int(table_text)
+                games = []
+                for game, (team1, team2) in enumerate(
+                    get_matchups_for_table(table_players), start=1
+                ):
+                    team1_score = getattr(input, _score_input_id(table, game, "team1"))()
+                    team2_score = getattr(input, _score_input_id(table, game, "team2"))()
+                    if team1_score is None or team2_score is None:
+                        raise ValueError(f"Vul alle 3 scores in voor tafel {table}.")
+                    if team1_score < 0 or team2_score < 0 or int(team1_score) != team1_score or int(team2_score) != team2_score:
+                        raise ValueError(f"Scores voor tafel {table} moeten niet-negatieve gehele getallen zijn.")
+                    games.append({
+                        "team1": team1, "team2": team2,
+                        "team1_score": int(team1_score), "team2_score": int(team2_score),
+                    })
+                all_table_scores.append((table, games))
+            for table, games in all_table_scores:
+                save_scores(play_date, table, games, str(SCORES_FILE))
+            score_refresh.set(score_refresh() + 1)
+            score_message.set(("success", f"Scores voor {play_date} zijn opgeslagen."))
+        except Exception as error:
+            score_message.set(("error", str(error)))
+
+    @render.ui
+    def score_entry_status():
+        message = score_message()
+        if not message:
+            return ui.HTML("")
+        kind, text = message
+        return ui.div(text, class_=f"status {'error-status' if kind == 'error' else ''}")
+
+    @render.ui
+    def standings():
+        score_refresh()
+        selected_date = input.standings_date() or None
+        return _standings_table(selected_date)
 
     @reactive.effect
     def delete_handlers():
