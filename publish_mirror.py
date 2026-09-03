@@ -8,7 +8,12 @@ ROOT = Path(__file__).resolve().parent
 MIRROR = ROOT / "mirror_app"
 DATA = MIRROR / "data"
 OUTPUT = ROOT / "docs"
-SNAPSHOT_FILES = ("pairings.csv", "pairings_history.csv", "scores_history.csv")
+SNAPSHOT_FILES = (
+    "pairings.csv",
+    "pairings_history.csv",
+    "scores_history.csv",
+    "reserve_assignments.csv",
+)
 SOURCE_DATA = ROOT / "data"
 PAGE_TITLE = "Manillen | Publieke mirror"
 

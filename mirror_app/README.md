@@ -1,6 +1,6 @@
 # Publieke Manillen-mirror
 
-Deze map bevat een read-only Shiny for Python-app voor GitHub Pages. De CSV-bestanden in `data/` zijn een snapshot; de app schrijft nooit naar deze bestanden.
+Deze map bevat een read-only Shiny for Python-app voor GitHub Pages. De CSV-bestanden in `data/` zijn een snapshot; de app schrijft nooit naar deze bestanden. Naast de indelings- en scoredata bevat de snapshot ook `reserve_assignments.csv`, zodat ingevulde reservenamen in Geschiedenis zichtbaar blijven.
 
 ## Lokaal testen
 

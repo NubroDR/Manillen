@@ -44,3 +44,19 @@ def load_pairing_counts(pairings_filename):
             if player1 and player2 and count >= 0:
                 rows.append((player1, player2, count))
     return rows
+
+
+def load_reserve_assignments(assignments_filename):
+    """Return saved reserve names grouped by date and reserve slot."""
+    path = Path(assignments_filename)
+    if not path.exists():
+        return {}
+    assignments = defaultdict(dict)
+    with path.open("r", encoding="utf-8", newline="") as file:
+        for row in csv.DictReader(file):
+            play_date = row.get("Date", "").strip()
+            slot = row.get("Slot", "").strip()
+            name = row.get("Name", "").strip()
+            if play_date and slot and name:
+                assignments[play_date][slot] = name
+    return dict(assignments)

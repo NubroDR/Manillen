@@ -104,7 +104,7 @@ git commit -m "Update publieke mirror"
 git push
 ```
 
-Het script kopieert `data/pairings.csv`, `data/pairings_history.csv` en, indien aanwezig, `data/scores_history.csv` naar `mirror_app/data/`, en voert `shinylive export mirror_app docs` uit. Git-commando’s blijven bewust handmatig.
+Het script kopieert `data/pairings.csv`, `data/pairings_history.csv`, `data/scores_history.csv` en `data/reserve_assignments.csv` indien aanwezig naar `mirror_app/data/`, en voert `shinylive export mirror_app docs` uit. De mirror gebruikt de reserve-snapshot om ingevulde reservenamen in de geschiedenis te tonen. Git-commando’s blijven bewust handmatig.
 
 Stel GitHub Pages in via **Settings > Pages > Build and deployment**. Kies **Deploy from a branch**, selecteer de publicatiebranch en kies als map **`/docs`**.
 

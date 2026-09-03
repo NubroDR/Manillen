@@ -4,10 +4,10 @@ from pathlib import Path
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 
 try:
-    from .data_helpers import load_pairing_counts, load_pairing_history
+    from .data_helpers import load_pairing_counts, load_pairing_history, load_reserve_assignments
     from .score_helpers import compute_standings
 except ImportError:
-    from data_helpers import load_pairing_counts, load_pairing_history
+    from data_helpers import load_pairing_counts, load_pairing_history, load_reserve_assignments
     from score_helpers import compute_standings
 
 
@@ -16,6 +16,7 @@ DATA_DIR = BASE_DIR / "data"
 HISTORY_FILE = DATA_DIR / "pairings_history.csv"
 PAIRINGS_FILE = DATA_DIR / "pairings.csv"
 SCORES_FILE = DATA_DIR / "scores_history.csv"
+RESERVE_ASSIGNMENTS_FILE = DATA_DIR / "reserve_assignments.csv"
 
 
 def _history_dates():
@@ -28,11 +29,18 @@ def _history_view():
         return ui.div("Nog geen speeldagen gevonden.", class_="empty-state")
     sections = []
     for play_date in sorted(history, reverse=True):
+        reserve_names = load_reserve_assignments(RESERVE_ASSIGNMENTS_FILE).get(play_date, {})
         tables = []
         for table, players in history[play_date]:
             tables.append(ui.div(
                 ui.div(f"Tafel {table}", class_="history-table-title"),
-                ui.div(*[ui.div(html.escape(player), class_="player-chip") for player in players], class_="player-grid"),
+                ui.div(*[
+                    ui.div(
+                        html.escape(reserve_names.get(player, player)),
+                        class_="player-chip reserve" if player.startswith("Reserve ") else "player-chip",
+                    )
+                    for player in players
+                ], class_="player-grid"),
                 class_="history-table",
             ))
         sections.append(ui.tags.section(
