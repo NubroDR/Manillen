@@ -22,6 +22,10 @@ Een Shiny for Python-app om 2v2-manillen-tafels te organiseren voor een familie-
 ├── score_functions.py        # Schrijfbare scoreworkflow met gedeelde scoreberekening.
 ├── reserve_assignments.py    # Datumgebonden CRUD voor ingevulde reservenamen.
 ├── requirements.txt          # Dependencies voor de volledige app.
+├── Dockerfile                # Image voor de volledige NAS-app.
+├── docker-compose.yml        # Portainer Stack-configuratie.
+├── docker-entrypoint.sh      # Seedt een leeg /app/data-volume.
+├── .dockerignore             # Beperkt de Docker build context.
 ├── publish_mirror.py         # Snapshot kopiëren en Shinylive-export starten.
 ├── data/
 │   ├── AllPlayers.csv        # Beschikbare spelers, één naam per regel.
@@ -67,9 +71,24 @@ Elke tafel speelt drie unieke 2v2-combinaties. Een spel loopt tot en met 101 pun
 
 ## NAS-hosting
 
-De schrijfbare app kan in Docker op de NAS draaien. Bouw een image met Python 3.11+, installeer `requirements.txt` en start de app op `0.0.0.0:8000`, bijvoorbeeld met `shiny run --host 0.0.0.0 --port 8000 app.py`. Koppel in Portainer een persistent volume aan `/app/data`, zodat CSV’s en gegenereerde scorebladen behouden blijven wanneer de container opnieuw wordt aangemaakt.
+De schrijfbare app draait via de root-level `Dockerfile`. Shiny luistert in de container op `0.0.0.0:8000`; omdat poort 8000 op de NAS al bezet is, publiceert de compose-configuratie de app op NAS-poort `8080` via `8080:8000`.
 
-Maak in Portainer een stack met dezelfde image, poortmapping `8000:8000` en een bind mount van een NAS-map naar `/app/data`. Beperk de toegang tot het lokale netwerk of gebruik Tailscale om de NAS-app privé te bereiken. De app gebruikt absolute paden vanuit `app.py` en blijft daardoor onafhankelijk van de working directory.
+Lokaal bouwen en starten:
+
+```powershell
+docker build -t manillen:latest .
+docker run --rm -p 8080:8000 -v manillen_data:/app/data manillen:latest
+```
+
+Open de app lokaal of via Tailscale op `http://<nas-hostnaam>:8080`.
+
+Het externe volume `manillen_data` moet vooraf bestaan. Bij een eerste start kopieert de entrypoint alleen ontbrekende basisbestanden naar `/app/data`, waaronder `Scorebladen.xlsx`. Bestaande CSV’s en scorebladen worden nooit overschreven. Gegenereerde scorebladen blijven samen met de datastore in het volume staan.
+
+Maak in Portainer een Stack from Git repository met deze repository. De stack gebruikt `docker-compose.yml`, bouwt vanuit de repository-root, gebruikt containernaam `manillen`, restartbeleid `unless-stopped` en mount `manillen_data:/app/data`. Het volume is als `external: true` gedeclareerd en moet dus al aangemaakt zijn. Er wordt geen volledige repository in de container gemount.
+
+Beperk de toegang tot het lokale netwerk of gebruik Tailscale om de NAS-app privé te bereiken. De app gebruikt absolute paden vanuit de projectcode en blijft daardoor onafhankelijk van de working directory. Na een nieuwe GitHub-versie kies je in Portainer **Pull and redeploy** of voer je een stack-update/redeploy uit, zodat de image opnieuw wordt gebouwd; `/app/data` blijft behouden.
+
+De volledige NAS-app en de publieke mirror zijn aparte deployments. De Docker-container voert alleen `app.py` uit en draait `mirror_app/` niet als viewer.
 
 ## Publieke read-only mirror
 

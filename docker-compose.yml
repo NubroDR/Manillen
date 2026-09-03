@@ -1,0 +1,15 @@
+services:
+  manillen:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: manillen
+    restart: unless-stopped
+    ports:
+      - "8080:8000"
+    volumes:
+      - manillen_data:/app/data
+
+volumes:
+  manillen_data:
+    external: true
