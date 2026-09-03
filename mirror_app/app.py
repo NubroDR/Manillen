@@ -18,7 +18,10 @@ HISTORY_FILE = DATA_DIR / "pairings_history.csv"
 PAIRINGS_FILE = DATA_DIR / "pairings.csv"
 SCORES_FILE = DATA_DIR / "scores_history.csv"
 RESERVE_ASSIGNMENTS_FILE = DATA_DIR / "reserve_assignments.csv"
-APP_CSS = (BASE_DIR.parent / "www" / "manillen.css").read_text(encoding="utf-8")
+STYLE_FILE = BASE_DIR / "manillen.css"
+if not STYLE_FILE.exists():
+    STYLE_FILE = BASE_DIR.parent / "www" / "manillen.css"
+APP_CSS = STYLE_FILE.read_text(encoding="utf-8")
 
 
 def _history_dates():

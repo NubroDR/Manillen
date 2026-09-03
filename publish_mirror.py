@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import shutil
 import subprocess
 import sys
@@ -15,6 +16,7 @@ SNAPSHOT_FILES = (
     "reserve_assignments.csv",
 )
 SOURCE_DATA = ROOT / "data"
+STYLE_SOURCE = ROOT / "www" / "manillen.css"
 PAGE_TITLE = "Manillen | Publieke mirror"
 
 
@@ -41,6 +43,21 @@ def _set_page_title():
     index_file.write_text(content, encoding="utf-8")
 
 
+def _embed_css_in_export():
+    manifest_file = OUTPUT / "app.json"
+    manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
+    css_literal = repr(STYLE_SOURCE.read_text(encoding="utf-8"))
+    for entry in manifest:
+        if entry.get("name") != "app.py":
+            continue
+        source = entry["content"]
+        start = source.index("STYLE_FILE = BASE_DIR / \"manillen.css\"")
+        end = source.index("\n\n\ndef _history_dates", start)
+        entry["content"] = source[:start] + f"APP_CSS = {css_literal}" + source[end:]
+        break
+    manifest_file.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+
+
 def main():
     DATA.mkdir(parents=True, exist_ok=True)
     copied = []
@@ -53,6 +70,7 @@ def main():
         elif destination.exists():
             destination.unlink()
     subprocess.run([_shinylive_command(), "export", str(MIRROR), str(OUTPUT)], cwd=ROOT, check=True)
+    _embed_css_in_export()
     _set_page_title()
     print("Mirror gepubliceerd als Shinylive-export.")
     print(f"Snapshots gekopieerd naar: {DATA}")
