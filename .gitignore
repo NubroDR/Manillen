@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.python-version
+
+# Generated score sheets; keep data/Scorebladen.xlsx tracked.
+data/Scorebladen/*.xlsx
+
+# Local Shinylive/cache artifacts. The committed Pages export remains in docs/.
+.shinylive/
+shinylive-cache/
+
+# Local OS files.
+.DS_Store
+Thumbs.db

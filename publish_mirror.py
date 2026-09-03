@@ -9,6 +9,7 @@ MIRROR = ROOT / "mirror_app"
 DATA = MIRROR / "data"
 OUTPUT = ROOT / "docs"
 SNAPSHOT_FILES = ("pairings.csv", "pairings_history.csv", "scores_history.csv")
+SOURCE_DATA = ROOT / "data"
 
 
 def _shinylive_command():
@@ -31,7 +32,7 @@ def main():
     DATA.mkdir(parents=True, exist_ok=True)
     copied = []
     for filename in SNAPSHOT_FILES:
-        source = ROOT / filename
+        source = SOURCE_DATA / filename
         destination = DATA / filename
         if source.exists():
             shutil.copy2(source, destination)

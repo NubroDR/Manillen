@@ -6,6 +6,9 @@ from datetime import date
 from pathlib import Path
 
 
+DEFAULT_SCORES_FILE = Path(__file__).resolve().parent / "data" / "scores_history.csv"
+
+
 def _score_date(play_date):
     if play_date is None:
         return date.today().isoformat()
@@ -21,7 +24,7 @@ def _score_date(play_date):
     raise ValueError("play_date must be a date or string in YYYY-MM-DD / YYYYMMDD format")
 
 
-def load_scores(scores_filename="scores_history.csv", play_date=None):
+def load_scores(scores_filename=str(DEFAULT_SCORES_FILE), play_date=None):
     selected_date = _score_date(play_date) if play_date is not None else None
     path = Path(scores_filename)
     if not path.exists():
@@ -42,7 +45,7 @@ def load_scores(scores_filename="scores_history.csv", play_date=None):
     return rows
 
 
-def compute_standings(scores_filename="scores_history.csv", play_date=None):
+def compute_standings(scores_filename=str(DEFAULT_SCORES_FILE), play_date=None):
     standings = defaultdict(lambda: {"games_played": 0, "wins": 0, "points_for": 0, "points_against": 0})
     for row in load_scores(scores_filename, play_date):
         team1 = [name.strip() for name in row["Team1Players"].split("|") if name.strip()]

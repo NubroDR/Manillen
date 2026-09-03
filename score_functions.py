@@ -2,7 +2,21 @@ import csv
 from datetime import date
 from pathlib import Path
 
-from mirror_app.score_helpers import compute_standings, load_scores
+from mirror_app.score_helpers import (
+    compute_standings as _compute_standings,
+    load_scores as _load_scores,
+)
+
+
+DATA_DIR = Path(__file__).resolve().parent / "data"
+
+
+def load_scores(scores_filename=str(DATA_DIR / "scores_history.csv"), play_date=None):
+    return _load_scores(scores_filename, play_date)
+
+
+def compute_standings(scores_filename=str(DATA_DIR / "scores_history.csv"), play_date=None):
+    return _compute_standings(scores_filename, play_date)
 
 
 SCORES_HEADER = [
@@ -61,7 +75,7 @@ def _score_value(value):
     return number
 
 
-def save_scores(play_date, table, game_scores, scores_filename="scores_history.csv"):
+def save_scores(play_date, table, game_scores, scores_filename=str(DATA_DIR / "scores_history.csv")):
     """Replace all scores for one date and table, then write the CSV."""
     play_date = _score_date(play_date)
     try:

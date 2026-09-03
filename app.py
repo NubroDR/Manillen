@@ -18,14 +18,14 @@ from score_functions import compute_standings, get_matchups_for_table, load_scor
 from mirror_app.data_helpers import load_pairing_counts, load_pairing_history
 
 
-# Keep these paths aligned with the notebook so both workflows share the data.
 BASE_DIR = Path(__file__).resolve().parent
-CSV_PAIRINGS = BASE_DIR / "pairings.csv"
-ALL_PLAYERS_FILE = BASE_DIR / "AllPlayers.csv"
-HISTORY_FILE = BASE_DIR / "pairings_history.csv"
-SCOREBLAD_TEMPLATE = BASE_DIR / "Scorebladen.xlsx"
-SCOREBLAD_OUTPUT_DIR = BASE_DIR / "Scorebladen"
-SCORES_FILE = BASE_DIR / "scores_history.csv"
+DATA_DIR = BASE_DIR / "data"
+CSV_PAIRINGS = DATA_DIR / "pairings.csv"
+ALL_PLAYERS_FILE = DATA_DIR / "AllPlayers.csv"
+HISTORY_FILE = DATA_DIR / "pairings_history.csv"
+SCOREBLAD_TEMPLATE = DATA_DIR / "Scorebladen.xlsx"
+SCOREBLAD_OUTPUT_DIR = DATA_DIR / "Scorebladen"
+SCORES_FILE = DATA_DIR / "scores_history.csv"
 
 
 def _history_dates():
