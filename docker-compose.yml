@@ -8,8 +8,4 @@ services:
     ports:
       - "8080:8000"
     volumes:
-      - manillen_data:/app/data
-
-volumes:
-  manillen_data:
-    external: true
+      - /volume1/manillen_data:/app/data
