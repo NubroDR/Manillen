@@ -8,7 +8,10 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 
-def load_all_players(csv_filename):
+DATA_DIR = Path(__file__).resolve().parent / 'data'
+
+
+def load_all_players(csv_filename=str(DATA_DIR / 'AllPlayers.csv')):
     """
     Load all players from a CSV file with one column (no header).
     Returns a list of player names.
@@ -47,7 +50,7 @@ def create_player_pool(active_players):
     
     return active_pool, number_of_tables, reserve_players
 
-def load_pair_counts(csv_filename):
+def load_pair_counts(csv_filename=str(DATA_DIR / 'pairings.csv')):
     """Load existing pair counts from CSV."""
     pair_counts = defaultdict(int)
     try:
@@ -63,7 +66,7 @@ def load_pair_counts(csv_filename):
     return pair_counts
 
 
-def save_pairings_history(config, play_date=None, history_filename='pairings_history.csv'):
+def save_pairings_history(config, play_date=None, history_filename=str(DATA_DIR / 'pairings_history.csv')):
     """Save a table pairing configuration to a history CSV file."""
     if play_date is None:
         play_date = date.today().isoformat()
@@ -123,7 +126,7 @@ def _clear_scoreblad_sheet(ws):
             ws[cell].value = None
 
 
-def _load_pairings_history(play_date=None, history_filename='pairings_history.csv'):
+def _load_pairings_history(play_date=None, history_filename=str(DATA_DIR / 'pairings_history.csv')):
     """Load pairings for a given date from pairings_history.csv."""
     play_date = _normalize_play_date(play_date).isoformat()
     pairings_by_table = {}
@@ -171,8 +174,8 @@ def _get_reserve_substitutions(reserve1=None, reserve2=None, reserve3=None):
 
 def fill_scorebladen_from_history(
     play_date=None,
-    history_filename='pairings_history.csv',
-    template_filename='Scorebladen.xlsx',
+    history_filename=str(DATA_DIR / 'pairings_history.csv'),
+    template_filename=str(DATA_DIR / 'Scorebladen.xlsx'),
     output_dir=None,
     reserve1=None,
     reserve2=None,
@@ -194,7 +197,7 @@ def fill_scorebladen_from_history(
 def fill_scorebladen(
     pairings,
     play_date=None,
-    template_filename='Scorebladen.xlsx',
+    template_filename=str(DATA_DIR / 'Scorebladen.xlsx'),
     output_dir=None,
     reserve1=None,
     reserve2=None,
@@ -495,7 +498,7 @@ def update_pairs_in_csv(config, csv_filename, history_filename=None, play_date=N
     print(f"Updated {csv_filename} with {pairs_added} pairs (Reserve pairs excluded)")
 
 
-def delete_pairings_by_date(play_date, csv_filename='pairings.csv', history_filename='pairings_history.csv'):
+def delete_pairings_by_date(play_date, csv_filename=str(DATA_DIR / 'pairings.csv'), history_filename=str(DATA_DIR / 'pairings_history.csv')):
     """Delete pairings for a given play date from history and decrement counts."""
     history_rows = []
     removed_rows = []
