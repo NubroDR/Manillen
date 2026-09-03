@@ -35,6 +35,7 @@ SCOREBLAD_TEMPLATE = DATA_DIR / "Scorebladen.xlsx"
 SCOREBLAD_OUTPUT_DIR = DATA_DIR / "Scorebladen"
 SCORES_FILE = DATA_DIR / "scores_history.csv"
 RESERVE_ASSIGNMENTS_FILE = DEFAULT_ASSIGNMENTS_FILE
+APP_CSS = (BASE_DIR / "www" / "manillen.css").read_text(encoding="utf-8")
 
 
 def _history_dates():
@@ -215,7 +216,14 @@ def player_selector(player_names, selected=None):
                 root.querySelector('#clear-players').addEventListener('click', () => {{ selected.clear(); render(); publish(); search.focus(); showSuggestions(); }});
                 render(); publish(); hideSuggestions();
             }};
-            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+            const start = () => {{
+                if (!window.Shiny || typeof window.Shiny.setInputValue !== 'function') {{
+                    window.setTimeout(start, 50);
+                    return;
+                }}
+                init();
+            }};
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
         }})();
         """
         return ui.div(
@@ -302,38 +310,7 @@ history_choices = _history_dates()
 app_ui = ui.page_fluid(
     ui.tags.head(
         ui.tags.title("Manillen | Speeldagen"),
-        ui.tags.style(
-            """
-            @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap');
-            :root { --ink:#18232b; --muted:#64747c; --paper:#f4f1ea; --panel:#fffdf8; --teal:#137b73; --gold:#e7a83e; --red:#b54d43; --line:#d9d7cc; }
-            * { box-sizing:border-box; } body { margin:0; background:radial-gradient(circle at 90% 0%, #dbeae2 0, transparent 30%), var(--paper); color:var(--ink); font-family:'DM Sans', sans-serif; }
-            h1,h2,h3 { font-family:'Space Grotesk', sans-serif; } .app-shell { max-width:1180px; margin:0 auto; padding:44px 24px 72px; }
-            .eyebrow { color:var(--teal); font-weight:700; letter-spacing:.12em; text-transform:uppercase; font-size:.75rem; } .intro { margin-bottom:28px; }
-            .intro h1 { font-size:clamp(2.2rem, 5vw, 4.4rem); line-height:.98; max-width:700px; margin:9px 0 14px; } .intro p { color:var(--muted); max-width:650px; font-size:1.05rem; }
-            .nav-tabs { border-bottom:1px solid var(--line); margin-bottom:24px; } .nav-tabs .nav-link { color:var(--muted); font-weight:700; } .nav-tabs .nav-link.active { color:var(--teal); border-color:var(--teal); background:transparent; }
-            .panel { background:rgba(255,253,248,.84); border:1px solid var(--line); padding:24px; margin-bottom:20px; box-shadow:0 12px 35px rgba(24,35,43,.05); }
-            .panel h2 { margin-top:0; } .form-group { margin-bottom:18px; } label { font-weight:700; }
-            .player-selector { position:relative; margin:18px 0 24px; } .player-selector > label { display:block; margin-bottom:8px; }
-            #player-search { width:100%; border:1px solid var(--line); border-radius:3px; padding:12px 14px; font-size:1rem; background:#fff; color:var(--ink); }
-            #player-search:focus { outline:3px solid rgba(19,123,115,.18); border-color:var(--teal); } .player-suggestions { position:absolute; z-index:10; top:76px; left:0; right:0; max-height:230px; overflow:auto; background:#fff; border:1px solid var(--line); box-shadow:0 10px 25px rgba(24,35,43,.12); } .player-suggestions[hidden] { display:none; }
-            .player-suggestion { display:block; width:100%; border:0; border-bottom:1px solid #eee; background:#fff; text-align:left; padding:11px 14px; color:var(--ink); cursor:pointer; } .player-suggestion:hover { background:#e7f1ed; color:var(--teal); } .suggestion-empty { padding:12px 14px; color:var(--muted); font-style:italic; }
-            .selected-player-chips { display:flex; flex-wrap:wrap; gap:8px; min-height:46px; padding:14px 0 8px; } .selection-chip { display:inline-flex; align-items:center; gap:7px; padding:6px 9px 6px 12px; border-radius:999px; background:#e6f0ec; border:1px solid #c8ddd5; } .selection-chip button { border:0; background:transparent; color:var(--teal); font-size:1.1rem; line-height:1; cursor:pointer; padding:0 2px; }
-            .selector-footer { display:flex; justify-content:space-between; align-items:center; gap:12px; color:var(--muted); font-size:.9rem; } .clear-players { border:0; background:transparent; color:var(--red); padding:4px 0; cursor:pointer; }
-            .btn-primary { background:var(--teal); border-color:var(--teal); } .btn-primary:hover { background:#0c625c; border-color:#0c625c; } .btn-success { background:var(--gold); border-color:var(--gold); color:var(--ink); }
-            .status { padding:12px 14px; margin:14px 0; border-left:4px solid var(--teal); background:#e7f1ed; } .error-status { border-color:var(--red); background:#f8e7e3; color:#7e2f2a; }
-            .tables-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; } .table-card { background:var(--panel); border:1px solid var(--line); padding:16px; }
-            .table-title,.history-table-title { font-family:'Space Grotesk'; font-weight:700; margin-bottom:13px; } .score-label { color:var(--teal); font-weight:700; margin-bottom:12px; }
-            .player-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; } .player-chip { background:#e6f0ec; border:1px solid #c8ddd5; padding:10px 8px; min-height:42px; display:flex; align-items:center; font-weight:500; }
-            .player-chip.reserve { background:#fff0cf; border-color:#ecd49b; color:#805d1d; } .configuration { margin-top:18px; } .alternative { border-top:1px solid var(--line); padding-top:18px; margin-top:22px; }
-            .history-day { border-top:1px solid var(--line); padding:22px 0; } .history-header { display:flex; justify-content:space-between; align-items:center; gap:12px; } .history-header h3 { margin:0 0 14px; }
-            .history-tables { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:10px; } .history-table { border-left:3px solid var(--gold); padding:10px 12px; background:#fffaf0; } .scores-button { color:var(--teal); border-color:var(--teal); background:transparent; }
-            .history-players { color:var(--muted); } .danger-button { color:var(--red); border-color:#dfaaa4; background:transparent; } .empty-state { color:var(--muted); padding:18px 0; }
-            .pairings-table { width:100%; border-collapse:collapse; background:var(--panel); } .pairings-table th, .pairings-table td { text-align:left; padding:11px 13px; border-bottom:1px solid var(--line); } .pairings-table th { color:var(--teal); font-family:'Space Grotesk'; } .pairings-table .pair-count { font-weight:700; text-align:right; } .pairings-table th:last-child { text-align:right; }
-            .score-table-card { border-top:1px solid var(--line); padding:20px 0; } .score-table-card h3 { margin-top:0; } .score-game { display:grid; grid-template-columns:70px minmax(140px,1fr) 100px 32px 100px minmax(140px,1fr); align-items:center; gap:12px; padding:12px; background:#fffaf0; margin:8px 0; } .score-game .form-group { margin:0; } .score-game-title { font-family:'Space Grotesk'; font-weight:700; } .score-team { font-weight:500; } .score-vs { color:var(--muted); text-align:center; font-weight:700; } .score-warning { color:#805d1d; background:#fff0cf; padding:9px 12px; margin-top:12px; } .score-error { color:#7e2f2a; background:#f8e7e3; padding:10px 12px; margin:12px 0; }
-            @media (max-width:760px) { .score-game { grid-template-columns:1fr 1fr; } .score-game-title { grid-column:1 / -1; } .score-vs { display:none; } }
-            @media (max-width:600px) { .app-shell { padding:28px 14px 50px; } .panel { padding:17px; } .history-header { align-items:flex-start; flex-direction:column; } }
-            """
-        )
+        ui.tags.style(APP_CSS)
     ),
     ui.div(
         ui.div("MANILLEN / SPEELDAGEN", class_="eyebrow"),
@@ -356,7 +333,7 @@ app_ui = ui.page_fluid(
                 ),
                 ui.output_ui("generation_status"),
                 ui.output_ui("configurations"),
-                ui.input_action_button("confirm", "Bevestig en bewaar", class_="btn-success"),
+                ui.output_ui("confirmation_controls"),
                 class_="panel",
             ),
         ),
@@ -370,9 +347,8 @@ app_ui = ui.page_fluid(
                     ui.output_ui("reserve_fields"),
                 ),
                 ui.output_ui("reserve_controls"),
-                ui.input_action_button("make_scorebladen", "Genereer scorebladen", class_="btn-primary"),
+                ui.output_ui("scoreblad_actions"),
                 ui.output_ui("scoreblad_status"),
-                ui.download_button("download_scorebladen", "Download scorebladen"),
                 class_="panel",
             ),
         ),
@@ -383,7 +359,7 @@ app_ui = ui.page_fluid(
                 ui.input_select("score_entry_date", "Speeldag", history_choices or {"": "Geen historiek beschikbaar"}),
                 ui.output_ui("score_entry_tables"),
                 ui.output_ui("score_validation"),
-                ui.input_action_button("save_scores", "Scores opslaan", class_="btn-success"),
+                ui.output_ui("score_entry_actions"),
                 ui.output_ui("score_entry_status"),
                 class_="panel",
             ),
@@ -478,6 +454,15 @@ def server(input: Inputs, output: Outputs, session: Session):
             return ui.HTML("")
         kind, text = message
         return ui.div(text, class_=f"status {'error-status' if kind == 'error' else ''}")
+
+    @render.ui
+    def confirmation_controls():
+        if not configuration_state():
+            return ui.HTML("")
+        return ui.div(
+            ui.input_action_button("confirm", "Bevestig en bewaar", class_="btn-success"),
+            class_="action-row",
+        )
 
     @render.ui
     def configurations():
@@ -588,6 +573,15 @@ def server(input: Inputs, output: Outputs, session: Session):
         history_refresh()
         score_refresh()
         return _score_entry_tables(input.score_entry_date())
+
+    @render.ui
+    def score_entry_actions():
+        if not input.score_entry_date() or not _read_history().get(input.score_entry_date(), []):
+            return ui.HTML("")
+        return ui.div(
+            ui.input_action_button("save_scores", "Scores opslaan", class_="btn-success"),
+            class_="action-row",
+        )
 
     @render.ui
     def score_validation():
@@ -741,6 +735,18 @@ def server(input: Inputs, output: Outputs, session: Session):
             ui.input_action_button("save_reserve_names", "Bewaar reservenamen"),
             ui.output_ui("reserve_status"),
         )
+
+    @render.ui
+    def scoreblad_actions():
+        play_date = input.score_date()
+        if not play_date:
+            return ui.HTML("")
+        generated_path = scoreblad_path()
+        download_path = generated_path if generated_path and not generated_path.startswith("ERROR:") else _scoreblad_file_for_date(play_date)
+        actions = [ui.input_action_button("make_scorebladen", "Genereer scorebladen", class_="btn-primary")]
+        if download_path:
+            actions.append(ui.download_button("download_scorebladen", "Download scorebladen"))
+        return ui.div(*actions, class_="action-row")
 
     @reactive.effect
     @reactive.event(input.save_reserve_names)
