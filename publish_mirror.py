@@ -10,6 +10,7 @@ DATA = MIRROR / "data"
 OUTPUT = ROOT / "docs"
 SNAPSHOT_FILES = ("pairings.csv", "pairings_history.csv", "scores_history.csv")
 SOURCE_DATA = ROOT / "data"
+PAGE_TITLE = "Manillen | Publieke mirror"
 
 
 def _shinylive_command():
@@ -28,6 +29,13 @@ def _shinylive_command():
     )
 
 
+def _set_page_title():
+    index_file = OUTPUT / "index.html"
+    content = index_file.read_text(encoding="utf-8")
+    content = content.replace("<title>Shiny App</title>", f"<title>{PAGE_TITLE}</title>")
+    index_file.write_text(content, encoding="utf-8")
+
+
 def main():
     DATA.mkdir(parents=True, exist_ok=True)
     copied = []
@@ -40,6 +48,7 @@ def main():
         elif destination.exists():
             destination.unlink()
     subprocess.run([_shinylive_command(), "export", str(MIRROR), str(OUTPUT)], cwd=ROOT, check=True)
+    _set_page_title()
     print("Mirror gepubliceerd als Shinylive-export.")
     print(f"Snapshots gekopieerd naar: {DATA}")
     print(f"Bestanden: {', '.join(copied) if copied else 'geen (bronbestanden ontbreken)'}")
