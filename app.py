@@ -16,6 +16,12 @@ from manillen_functions import (
 )
 from score_functions import compute_standings, get_matchups_for_table, load_scores, save_scores
 from mirror_app.data_helpers import load_pairing_counts, load_pairing_history
+from reserve_assignments import (
+    DEFAULT_ASSIGNMENTS_FILE,
+    get_reserve_assignments,
+    required_reserve_count,
+    save_reserve_assignments,
+)
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -26,6 +32,7 @@ HISTORY_FILE = DATA_DIR / "pairings_history.csv"
 SCOREBLAD_TEMPLATE = DATA_DIR / "Scorebladen.xlsx"
 SCOREBLAD_OUTPUT_DIR = DATA_DIR / "Scorebladen"
 SCORES_FILE = DATA_DIR / "scores_history.csv"
+RESERVE_ASSIGNMENTS_FILE = DEFAULT_ASSIGNMENTS_FILE
 
 
 def _history_dates():
@@ -133,9 +140,9 @@ def _standings_table(play_date=None):
     )
 
 
-def _player_name(name):
+def _player_name(name, reserve=False):
     safe_name = html.escape(str(name))
-    reserve_class = " reserve" if str(name).startswith("Reserve ") else ""
+    reserve_class = " reserve" if reserve or str(name).startswith("Reserve ") else ""
     return ui.HTML(f'<div class="player-chip{reserve_class}">{safe_name}</div>')
 
 
@@ -240,10 +247,17 @@ def _history_cards():
 
     sections = []
     for play_date in sorted(history, reverse=True):
+        reserve_names = get_reserve_assignments(play_date, RESERVE_ASSIGNMENTS_FILE)
         tables = [
             ui.div(
                 ui.div(f"Tafel {table}", class_="history-table-title"),
-                ui.div(*[_player_name(player) for player in players], class_="history-players"),
+                ui.div(
+                    *[_player_name(
+                        reserve_names.get(player, player),
+                        reserve=player.startswith("Reserve "),
+                    ) for player in players],
+                    class_="history-players",
+                ),
                 class_="history-table",
             )
             for table, players in history[play_date]
@@ -335,10 +349,9 @@ app_ui = ui.page_fluid(
                 ui.p("Maak scorebladen voor een bestaande of net opgeslagen speeldag."),
                 ui.input_select("score_date", "Speeldag", history_choices or {"": "Geen historiek beschikbaar"}),
                 ui.layout_columns(
-                    ui.input_text("reserve1", "Reserve 1 vervangen door", placeholder="Optioneel"),
-                    ui.input_text("reserve2", "Reserve 2 vervangen door", placeholder="Optioneel"),
-                    ui.input_text("reserve3", "Reserve 3 vervangen door", placeholder="Optioneel"),
+                    ui.output_ui("reserve_fields"),
                 ),
+                ui.output_ui("reserve_controls"),
                 ui.input_action_button("make_scorebladen", "Genereer scorebladen", class_="btn-primary"),
                 ui.output_ui("scoreblad_status"),
                 ui.download_button("download_scorebladen", "Download scorebladen"),
@@ -400,6 +413,7 @@ def server(input: Inputs, output: Outputs, session: Session):
     history_refresh = reactive.Value(0)
     score_refresh = reactive.Value(0)
     score_message = reactive.Value[tuple[str, str] | None](None)
+    reserve_message = reactive.Value[tuple[str, str] | None](None)
     delete_clicks = reactive.Value[dict[str, int]]({})
     pending_delete = reactive.Value[str | None](None)
 
@@ -621,19 +635,94 @@ def server(input: Inputs, output: Outputs, session: Session):
             pending_delete.set(None)
             ui.modal_remove()
 
+    def current_reserve_assignments(play_date):
+        count = required_reserve_count(play_date, str(HISTORY_FILE))
+        assignments = {}
+        for slot_number in range(1, count + 1):
+            reader = getattr(input, f"reserve{slot_number}", None)
+            value = reader() if reader else None
+            if value and value.strip():
+                assignments[f"Reserve {slot_number}"] = value.strip()
+        return assignments
+
+    def reserve_count_for_date(play_date):
+        return required_reserve_count(play_date, str(HISTORY_FILE)) if play_date else 0
+
+    @render.ui
+    def reserve_fields():
+        play_date = input.score_date()
+        count = reserve_count_for_date(play_date)
+        if count == 0:
+            return ui.HTML("")
+        existing = get_reserve_assignments(play_date, RESERVE_ASSIGNMENTS_FILE)
+        fields = [
+            ui.input_text(
+                f"reserve{slot_number}",
+                f"Reserve {slot_number} vervangen door",
+                value=existing.get(f"Reserve {slot_number}", ""),
+                placeholder="Optioneel",
+            )
+            for slot_number in range(1, count + 1)
+        ]
+        return ui.div(*fields, class_="reserve-fields")
+
+    @render.ui
+    def reserve_controls():
+        play_date = input.score_date()
+        if reserve_count_for_date(play_date) == 0:
+            return ui.HTML("")
+        return ui.div(
+            ui.input_action_button("save_reserve_names", "Bewaar reservenamen"),
+            ui.output_ui("reserve_status"),
+        )
+
+    @reactive.effect
+    @reactive.event(input.save_reserve_names)
+    def save_reserve_names():
+        play_date = input.score_date()
+        try:
+            if not play_date:
+                raise ValueError("Kies eerst een speeldag.")
+            save_reserve_assignments(
+                play_date,
+                current_reserve_assignments(play_date),
+                RESERVE_ASSIGNMENTS_FILE,
+            )
+            history_refresh.set(history_refresh() + 1)
+            reserve_message.set(("success", f"Reservenamen voor {play_date} zijn opgeslagen."))
+        except Exception as error:
+            reserve_message.set(("error", str(error)))
+
+    @render.ui
+    def reserve_status():
+        message = reserve_message()
+        if not message:
+            return ui.HTML("")
+        kind, text = message
+        return ui.div(text, class_=f"status {'error-status' if kind == 'error' else ''}")
+
     @reactive.effect
     @reactive.event(input.make_scorebladen)
     def create_scorebladen():
         try:
             if not input.score_date():
                 raise ValueError("Kies eerst een speeldag.")
+            play_date = input.score_date()
+            save_reserve_assignments(
+                play_date,
+                current_reserve_assignments(play_date),
+                RESERVE_ASSIGNMENTS_FILE,
+            )
+            history_refresh.set(history_refresh() + 1)
             scoreblad_path.set(
                 fill_scorebladen_from_history(
-                    play_date=input.score_date(),
+                    play_date=play_date,
                     history_filename=str(HISTORY_FILE),
                     template_filename=str(SCOREBLAD_TEMPLATE),
                     output_dir=str(SCOREBLAD_OUTPUT_DIR),
-                    reserve1=input.reserve1(), reserve2=input.reserve2(), reserve3=input.reserve3(),
+                    reserve1=get_reserve_assignments(play_date, RESERVE_ASSIGNMENTS_FILE).get("Reserve 1"),
+                    reserve2=get_reserve_assignments(play_date, RESERVE_ASSIGNMENTS_FILE).get("Reserve 2"),
+                    reserve3=get_reserve_assignments(play_date, RESERVE_ASSIGNMENTS_FILE).get("Reserve 3"),
                 )
             )
         except Exception as error:

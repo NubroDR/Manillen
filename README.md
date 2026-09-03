@@ -7,7 +7,8 @@ Een Shiny for Python-app om 2v2-manillen-tafels te organiseren voor een familie-
 - Spelers selecteren met een typeahead-selector.
 - Automatisch tafels van vier spelers indelen met zo weinig mogelijk herhaalde partners.
 - Indelingen bewaren en eerdere speeldagen bekijken of verwijderen.
-- Excel-scorebladen genereren vanuit een opgeslagen speeldag.
+- Excel-scorebladen genereren vanuit een opgeslagen speeldag, met alleen het benodigde aantal reservevelden.
+- Reservenamen per speeldag opslaan en automatisch opnieuw laden; reserves krijgen een afwijkende Excel-stijl.
 - Scores voor de drie 2v2-spellen per tafel invoeren.
 - Een tussenstand bekijken voor alle speeldagen of één specifieke speeldag.
 - Een publieke, read-only Shinylive-mirror publiceren naar GitHub Pages.
@@ -19,6 +20,7 @@ Een Shiny for Python-app om 2v2-manillen-tafels te organiseren voor een familie-
 ├── app.py                    # Volledige schrijfbare NAS-app.
 ├── manillen_functions.py     # Indeling, paringen en scorebladlogica.
 ├── score_functions.py        # Schrijfbare scoreworkflow met gedeelde scoreberekening.
+├── reserve_assignments.py    # Datumgebonden CRUD voor ingevulde reservenamen.
 ├── requirements.txt          # Dependencies voor de volledige app.
 ├── publish_mirror.py         # Snapshot kopiëren en Shinylive-export starten.
 ├── data/
@@ -26,6 +28,7 @@ Een Shiny for Python-app om 2v2-manillen-tafels te organiseren voor een familie-
 │   ├── pairings.csv          # Partnerhistoriek met Player1, Player2, Count.
 │   ├── pairings_history.csv  # Opgeslagen tafels per Date, Table en Players.
 │   ├── scores_history.csv    # Scores per Date, Table en Game.
+│   ├── reserve_assignments.csv # Ingevulde reservenamen per Date en Slot.
 │   ├── Scorebladen.xlsx      # Leeg Excel-template.
 │   └── Scorebladen/          # Gegenereerde scorebladen; lokaal genegeerd door git.
 ├── mirror_app/
@@ -41,7 +44,7 @@ Een Shiny for Python-app om 2v2-manillen-tafels te organiseren voor een familie-
 └── docs/                     # Gegenereerde Shinylive-site voor GitHub Pages.
 ```
 
-`scorebladen_inspect.txt` is een lokaal inspectienotitie-bestand en maakt geen deel uit van de actieve runtime.
+De gegenereerde bestanden onder `data/Scorebladen/` worden niet getrackt; het lege `data/Scorebladen.xlsx`-template blijft wel behouden.
 
 ## Aan de slag
 
@@ -70,7 +73,7 @@ Maak in Portainer een stack met dezelfde image, poortmapping `8000:8000` en een 
 
 ## Publieke read-only mirror
 
-`mirror_app/` toont alleen Geschiedenis, Tussenstand en Parenhistoriek. Er zijn geen formulieren, score-invoer, indelingsknoppen of verwijderacties. De CSV’s in `mirror_app/data/` zijn een snapshot en worden niet live van de NAS gelezen.
+`mirror_app/` toont alleen Geschiedenis, Tussenstand en Parenhistoriek. Er zijn geen formulieren, score-invoer, indelingsknoppen of verwijderacties. De CSV’s in `mirror_app/data/` zijn een snapshot en worden niet live van de NAS gelezen. Op mobiel staat de navigatie sticky bovenaan met een hamburgerknop; de drie tabs klappen verticaal uit.
 
 Werk de snapshot en GitHub Pages-export bij vanuit de repository-root:
 
@@ -98,6 +101,7 @@ shiny run mirror_app/app.py
 - `pairings.csv`: CSV met de kolommen `Player1`, `Player2` en `Count`; elke rij is een ongesorteerd partnerpaar met de actuele telling.
 - `pairings_history.csv`: CSV met `Date`, `Table` en `Players`; de vier spelers staan in één veld, gescheiden door ` | `.
 - `scores_history.csv`: CSV met `Date`, `Table`, `Game`, `Team1Players`, `Team2Players`, `Team1Score` en `Team2Score`.
+- `reserve_assignments.csv`: CSV met `Date`, `Slot` en `Name`; bewaart ingevulde reservenamen per speeldag.
 - `Scorebladen.xlsx`: leeg Excel-template voor maximaal vier tafels.
 - `Scorebladen/`: automatisch gemaakte Excel-bestanden per speeldatum; dit zijn uitvoerbestanden en worden niet getrackt.
 

@@ -2,13 +2,17 @@ import csv
 import itertools as it
 import shutil
 from collections import defaultdict
+from copy import copy
 from datetime import date
 from pathlib import Path
 
 from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
 
 
 DATA_DIR = Path(__file__).resolve().parent / 'data'
+RESERVE_FILL = PatternFill(fill_type='solid', fgColor='FFF0CF')
+RESERVE_TEXT_COLOR = '806B1D'
 
 
 def load_all_players(csv_filename=str(DATA_DIR / 'AllPlayers.csv')):
@@ -263,10 +267,13 @@ def fill_scorebladen(
 
         for block, matchup in zip(SCOREBLAD_NAME_BLOCKS, matchups):
             for cell, player in zip(block, matchup):
-                if player in reserve_substitutions:
-                    ws[cell].value = reserve_substitutions[player]
-                else:
-                    ws[cell].value = player
+                cell_value = reserve_substitutions.get(player, player)
+                ws[cell].value = cell_value
+                if player.casefold().startswith('reserve '):
+                    ws[cell].fill = copy(RESERVE_FILL)
+                    font = copy(ws[cell].font)
+                    font.color = RESERVE_TEXT_COLOR
+                    ws[cell].font = font
 
     wb.save(output_path)
 
