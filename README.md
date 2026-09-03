@@ -21,6 +21,7 @@ Een Shiny for Python-app om 2v2-manillen-tafels te organiseren voor een familie-
 ├── manillen_functions.py     # Indeling, paringen en scorebladlogica.
 ├── score_functions.py        # Schrijfbare scoreworkflow met gedeelde scoreberekening.
 ├── reserve_assignments.py    # Datumgebonden CRUD voor ingevulde reservenamen.
+├── github_publish.py         # Veilige GitHub Actions workflow-dispatch.
 ├── requirements.txt          # Dependencies voor de volledige app.
 ├── Dockerfile                # Image voor de volledige NAS-app.
 ├── docker-compose.yml        # Portainer Stack-configuratie.
@@ -89,6 +90,23 @@ Maak in Portainer een Stack from Git repository met deze repository. De stack ge
 Beperk de toegang tot het lokale netwerk of gebruik Tailscale om de NAS-app privé te bereiken. De app gebruikt absolute paden vanuit de projectcode en blijft daardoor onafhankelijk van de working directory. Na een nieuwe GitHub-versie kies je in Portainer **Pull and redeploy** of voer je een stack-update/redeploy uit, zodat de image opnieuw wordt gebouwd; `/app/data` blijft behouden.
 
 De volledige NAS-app en de publieke mirror zijn aparte deployments. De Docker-container voert alleen `app.py` uit en draait `mirror_app/` niet als viewer.
+
+### NAS -> publieke mirror publiceren
+
+In de NAS-app staat in het tabblad Geschiedenis de knop **Publiceer data**. Deze knop start alleen de GitHub Actions-workflow via GitHub’s `workflow_dispatch` API. De workflow voert daarna zelf `publish_mirror.py` uit, commit de nieuwe snapshot en werkt GitHub Pages bij. Een succesmelding betekent dus alleen dat de workflow is gestart; GitHub Pages kan daarna nog enige tijd nodig hebben.
+
+Stel in Portainer de volgende environment variables in voor de container:
+
+- `GITHUB_TOKEN`: verplicht; een token met voldoende rechten om de geconfigureerde workflow te dispatchen.
+- `GITHUB_REPOSITORY`: verplicht, in de vorm `owner/repository`.
+- `GITHUB_WORKFLOW`: verplicht; voor de meegeleverde workflow is dit `publish-mirror.yml`.
+- `GITHUB_REF`: optioneel; de ref waarop de workflow dispatcht, standaard `main`.
+
+De meegeleverde workflow staat in `.github/workflows/publish-mirror.yml` en kan handmatig of via de NAS-knop worden gestart. De token wordt uitsluitend uit de environment gelezen en wordt nooit in de UI, logs of foutmeldingen getoond. De NAS-app voert zelf geen `publish_mirror.py` uit en maakt geen Git-commit. De volledige flow is:
+
+```text
+NAS-knop -> GitHub API -> workflow_dispatch -> publish_mirror.py -> GitHub commit -> GitHub Pages
+```
 
 ## Publieke read-only mirror
 

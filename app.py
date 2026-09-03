@@ -1,5 +1,6 @@
 import html
 import json
+import asyncio
 from datetime import date
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from reserve_assignments import (
     required_reserve_count,
     save_reserve_assignments,
 )
+from github_publish import GitHubPublishError, trigger_mirror_workflow
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -150,6 +152,10 @@ def _delete_input_id(play_date):
     return f"delete_{play_date.replace('-', '_')}"
 
 
+def _scores_input_id(play_date):
+    return f"scores_{play_date.replace('-', '_')}"
+
+
 def player_selector(player_names, selected=None):
         """Render the client-side typeahead selector for the new-day workflow."""
         selected = selected if selected is not None else []
@@ -245,8 +251,14 @@ def _history_cards():
     if not history:
         return ui.div("Nog geen speeldagen gevonden.", class_="empty-state")
 
+    today = date.today().isoformat()
+    future_dates = sorted(item for item in history if item > today)
+    played_dates = sorted((item for item in history if item <= today), reverse=True)
     sections = []
-    for play_date in sorted(history, reverse=True):
+    if future_dates:
+        sections.append(ui.h2("Toekomstige speeldag", class_="history-section-title"))
+
+    for play_date in future_dates + played_dates:
         reserve_names = get_reserve_assignments(play_date, RESERVE_ASSIGNMENTS_FILE)
         tables = [
             ui.div(
@@ -266,6 +278,10 @@ def _history_cards():
             ui.div(
                 ui.div(
                     ui.h3(play_date),
+                    ui.tags.button(
+                        "Scores", type="button", class_="scores-button",
+                        onclick=f"window.Shiny.setInputValue('score_navigation', '{play_date}', {{priority:'event'}})",
+                    ),
                     ui.input_action_button(
                         _delete_input_id(play_date), "Verwijder speeldag", class_="danger-button"
                     ),
@@ -275,6 +291,8 @@ def _history_cards():
                 class_="history-day",
             )
         )
+        if played_dates and play_date == played_dates[0]:
+            sections.insert(len(sections) - 1, ui.h2("Gespeelde dagen", class_="history-section-title"))
     return ui.div(*sections)
 
 
@@ -308,7 +326,7 @@ app_ui = ui.page_fluid(
             .player-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; } .player-chip { background:#e6f0ec; border:1px solid #c8ddd5; padding:10px 8px; min-height:42px; display:flex; align-items:center; font-weight:500; }
             .player-chip.reserve { background:#fff0cf; border-color:#ecd49b; color:#805d1d; } .configuration { margin-top:18px; } .alternative { border-top:1px solid var(--line); padding-top:18px; margin-top:22px; }
             .history-day { border-top:1px solid var(--line); padding:22px 0; } .history-header { display:flex; justify-content:space-between; align-items:center; gap:12px; } .history-header h3 { margin:0 0 14px; }
-            .history-tables { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:10px; } .history-table { border-left:3px solid var(--gold); padding:10px 12px; background:#fffaf0; }
+            .history-tables { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:10px; } .history-table { border-left:3px solid var(--gold); padding:10px 12px; background:#fffaf0; } .scores-button { color:var(--teal); border-color:var(--teal); background:transparent; }
             .history-players { color:var(--muted); } .danger-button { color:var(--red); border-color:#dfaaa4; background:transparent; } .empty-state { color:var(--muted); padding:18px 0; }
             .pairings-table { width:100%; border-collapse:collapse; background:var(--panel); } .pairings-table th, .pairings-table td { text-align:left; padding:11px 13px; border-bottom:1px solid var(--line); } .pairings-table th { color:var(--teal); font-family:'Space Grotesk'; } .pairings-table .pair-count { font-weight:700; text-align:right; } .pairings-table th:last-child { text-align:right; }
             .score-table-card { border-top:1px solid var(--line); padding:20px 0; } .score-table-card h3 { margin-top:0; } .score-game { display:grid; grid-template-columns:70px minmax(140px,1fr) 100px 32px 100px minmax(140px,1fr); align-items:center; gap:12px; padding:12px; background:#fffaf0; margin:8px 0; } .score-game .form-group { margin:0; } .score-game-title { font-family:'Space Grotesk'; font-weight:700; } .score-team { font-weight:500; } .score-vs { color:var(--muted); text-align:center; font-weight:700; } .score-warning { color:#805d1d; background:#fff0cf; padding:9px 12px; margin-top:12px; } .score-error { color:#7e2f2a; background:#f8e7e3; padding:10px 12px; margin:12px 0; }
@@ -381,7 +399,13 @@ app_ui = ui.page_fluid(
         ),
         ui.nav_panel(
             "Geschiedenis",
-            ui.div(ui.h2("Gespeelde dagen"), ui.output_ui("history"), class_="panel"),
+            ui.div(
+                ui.h2("Speeldagen"),
+                ui.input_action_button("publish_mirror", "Publiceer data", class_="btn-primary"),
+                ui.output_ui("publish_status"),
+                ui.output_ui("history"),
+                class_="panel",
+            ),
         ),
         ui.nav_panel(
             "Paringen",
@@ -413,6 +437,8 @@ def server(input: Inputs, output: Outputs, session: Session):
     history_refresh = reactive.Value(0)
     score_refresh = reactive.Value(0)
     score_message = reactive.Value[tuple[str, str] | None](None)
+    publish_message = reactive.Value[tuple[str, str] | None](None)
+    publish_running = reactive.Value(False)
     reserve_message = reactive.Value[tuple[str, str] | None](None)
     delete_clicks = reactive.Value[dict[str, int]]({})
     pending_delete = reactive.Value[str | None](None)
@@ -511,6 +537,46 @@ def server(input: Inputs, output: Outputs, session: Session):
     def history():
         history_refresh()
         return _history_cards()
+
+    @reactive.effect
+    @reactive.event(input.score_navigation)
+    def scores_navigation():
+        play_date = input.score_navigation()
+        ui.update_select("score_entry_date", selected=play_date)
+        ui.update_navset("tabs", selected="Scores invoeren")
+
+    @render.ui
+    def publish_status():
+        message = publish_message()
+        if not message:
+            return ui.HTML("")
+        kind, text = message
+        return ui.div(text, class_=f"status {'error-status' if kind == 'error' else ''}")
+
+    @reactive.effect
+    @reactive.event(input.publish_mirror)
+    async def publish_mirror():
+        if publish_running():
+            return
+        publish_running.set(True)
+        publish_message.set(("running", "Publiceren..."))
+        ui.update_action_button("publish_mirror", label="Publiceren...", disabled=True)
+        try:
+            await asyncio.to_thread(trigger_mirror_workflow)
+            publish_message.set((
+                "success",
+                "Publicatie gestart. GitHub Actions verwerkt de update.",
+            ))
+        except GitHubPublishError as error:
+            publish_message.set(("error", str(error)))
+        except Exception:
+            publish_message.set((
+                "error",
+                "GitHub-publicatie mislukt door een onverwachte fout.",
+            ))
+        finally:
+            publish_running.set(False)
+            ui.update_action_button("publish_mirror", label="Publiceer data", disabled=False)
 
     @render.ui
     def pairings():
