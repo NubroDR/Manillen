@@ -1,0 +1,22 @@
+Date,Table,Game,Team1Players,Team2Players,Team1Score,Team2Score
+2026-02-14,1,1,Etienne | Gildon,Martine | Robby,103,41
+2026-02-14,1,2,Etienne | Martine,Gildon | Robby,62,107
+2026-02-14,1,3,Etienne | Robby,Gildon | Martine,80,108
+2026-02-14,2,1,Gilbert | Kirsten,Kristien | Peter,68,103
+2026-02-14,2,2,Gilbert | Kristien,Kirsten | Peter,99,107
+2026-02-14,2,3,Gilbert | Peter,Kirsten | Kristien,59,101
+2026-02-14,3,1,Freddy | Frederik,Marc | Matthias,116,80
+2026-02-14,3,2,Freddy | Marc,Frederik | Matthias,115,83
+2026-02-14,3,3,Freddy | Matthias,Frederik | Marc,104,10
+2026-02-14,4,1,Bruno | José,Pascal | Zoë,107,56
+2026-02-14,4,2,Bruno | Pascal,José | Zoë,79,102
+2026-02-14,4,3,Bruno | Zoë,José | Pascal,117,92
+2026-05-16,1,1,Freddy | J.-P.,Pascal | Peter,118,38
+2026-05-16,1,2,Freddy | Pascal,J.-P. | Peter,112,33
+2026-05-16,1,3,Freddy | Peter,J.-P. | Pascal,58,104
+2026-05-16,2,1,Jeffrey | José,Martine | Matthias,69,133
+2026-05-16,2,2,Jeffrey | Martine,José | Matthias,46,106
+2026-05-16,2,3,Jeffrey | Matthias,José | Martine,113,73
+2026-05-16,3,1,Bruno | Frederik,Katrien | Zoë,115,75
+2026-05-16,3,2,Bruno | Katrien,Frederik | Zoë,61,108
+2026-05-16,3,3,Bruno | Zoë,Frederik | Katrien,33,110

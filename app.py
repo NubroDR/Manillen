@@ -1,4 +1,3 @@
-import csv
 import html
 import json
 from datetime import date
@@ -16,6 +15,7 @@ from manillen_functions import (
     update_pairs_in_csv,
 )
 from score_functions import compute_standings, get_matchups_for_table, load_scores, save_scores
+from mirror_app.data_helpers import load_pairing_counts, load_pairing_history
 
 
 # Keep these paths aligned with the notebook so both workflows share the data.
@@ -29,44 +29,18 @@ SCORES_FILE = BASE_DIR / "scores_history.csv"
 
 
 def _history_dates():
-    dates = set()
-    try:
-        with HISTORY_FILE.open("r", encoding="utf-8", newline="") as file:
-            for row in csv.DictReader(file):
-                if row.get("Date"):
-                    dates.add(row["Date"].strip())
-    except FileNotFoundError:
-        pass
-    return sorted(dates, reverse=True)
+    return sorted(load_pairing_history(HISTORY_FILE), reverse=True)
 
 
 def _read_history():
-    grouped = {}
-    try:
-        with HISTORY_FILE.open("r", encoding="utf-8", newline="") as file:
-            for row in csv.DictReader(file):
-                players = [name.strip() for name in row.get("Players", "").split("|")]
-                if len(players) == 4:
-                    grouped.setdefault(row.get("Date", ""), []).append(
-                        (row.get("Table", ""), players)
-                    )
-    except FileNotFoundError:
-        return {}
-    return {key: sorted(value, key=lambda item: int(item[0])) for key, value in grouped.items()}
+    return {
+        play_date: [(str(table), players) for table, players in tables]
+        for play_date, tables in load_pairing_history(HISTORY_FILE).items()
+    }
 
 
 def _pairings_table(selected_player=None):
-    rows = []
-    try:
-        with CSV_PAIRINGS.open("r", encoding="utf-8", newline="") as file:
-            for row in csv.DictReader(file):
-                try:
-                    count = int(row.get("Count", 0))
-                except (TypeError, ValueError):
-                    continue
-                rows.append((row.get("Player1", ""), row.get("Player2", ""), count))
-    except FileNotFoundError:
-        return ui.div("pairings.csv werd niet gevonden.", class_="empty-state")
+    rows = [row for row in load_pairing_counts(CSV_PAIRINGS) if row[2] > 0]
 
     if not rows:
         return ui.div("Nog geen paringen gevonden.", class_="empty-state")
@@ -100,6 +74,13 @@ def _pairings_table(selected_player=None):
 
 def _score_input_id(table, game, team):
     return f"score_t{table}_g{game}_{team}"
+
+
+def _scoreblad_file_for_date(play_date):
+    if not play_date:
+        return None
+    path = SCOREBLAD_OUTPUT_DIR / f"scorebladen{play_date.replace('-', '')}.xlsx"
+    return path if path.exists() else None
 
 
 def _score_entry_tables(play_date):
@@ -667,10 +648,16 @@ def server(input: Inputs, output: Outputs, session: Session):
             return ui.div(path, class_="status error-status")
         return ui.div(f"Gemaakt: {Path(path).name}", class_="status")
 
-    @render.download(filename=lambda: Path(scoreblad_path() or "scorebladen.xlsx").name)
+    @render.download(
+        filename=lambda: Path(
+            scoreblad_path()
+            or _scoreblad_file_for_date(input.score_date())
+            or "scorebladen.xlsx"
+        ).name
+    )
     async def download_scorebladen():
-        path = scoreblad_path()
-        if path and not path.startswith("ERROR:") and Path(path).exists():
+        path = scoreblad_path() or _scoreblad_file_for_date(input.score_date())
+        if path and not (isinstance(path, str) and path.startswith("ERROR:")) and Path(path).exists():
             yield Path(path).read_bytes()
 
 
