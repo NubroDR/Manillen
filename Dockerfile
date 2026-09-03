@@ -8,8 +8,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py manillen_functions.py score_functions.py reserve_assignments.py ./
+COPY app.py manillen_functions.py score_functions.py reserve_assignments.py github_publish.py ./
 COPY mirror_app/__init__.py mirror_app/data_helpers.py mirror_app/score_helpers.py ./mirror_app/
+COPY www/ ./www/
 COPY data/ ./data-seed/
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
