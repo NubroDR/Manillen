@@ -1,7 +1,8 @@
 import csv
-from collections import defaultdict
 from datetime import date
 from pathlib import Path
+
+from mirror_app.score_helpers import compute_standings, load_scores
 
 
 SCORES_HEADER = [
@@ -109,53 +110,3 @@ def save_scores(play_date, table, game_scores, scores_filename="scores_history.c
     return str(path)
 
 
-def load_scores(scores_filename="scores_history.csv", play_date=None):
-    """Load score rows, optionally limited to one ISO date."""
-    selected_date = _score_date(play_date) if play_date is not None else None
-    path = Path(scores_filename)
-    if not path.exists():
-        return []
-    with path.open("r", encoding="utf-8", newline="") as file:
-        rows = []
-        for row in csv.DictReader(file):
-            if selected_date is not None and row.get("Date") != selected_date:
-                continue
-            try:
-                row["Table"] = int(row["Table"])
-                row["Game"] = int(row["Game"])
-                row["Team1Score"] = int(row["Team1Score"])
-                row["Team2Score"] = int(row["Team2Score"])
-            except (TypeError, ValueError):
-                continue
-            rows.append(row)
-    return rows
-
-
-def compute_standings(scores_filename="scores_history.csv", play_date=None):
-    """Compute sorted individual standings from saved 2v2 scores."""
-    standings = defaultdict(lambda: {
-        "games_played": 0, "wins": 0, "points_for": 0, "points_against": 0,
-    })
-    for row in load_scores(scores_filename, play_date):
-        team1 = [name.strip() for name in row["Team1Players"].split("|") if name.strip()]
-        team2 = [name.strip() for name in row["Team2Players"].split("|") if name.strip()]
-        if len(team1) != 2 or len(team2) != 2:
-            continue
-        scores = (row["Team1Score"], row["Team2Score"])
-        for team_index, team in enumerate((team1, team2)):
-            points_for, points_against = scores[team_index], scores[1 - team_index]
-            for player in team:
-                item = standings[player]
-                item["games_played"] += 1
-                item["wins"] += int(points_for > points_against)
-                item["points_for"] += points_for
-                item["points_against"] += points_against
-
-    result = []
-    for player, values in standings.items():
-        result.append({
-            "player": player,
-            **values,
-            "point_diff": values["points_for"] - values["points_against"],
-        })
-    return sorted(result, key=lambda row: (-row["wins"], -row["games_played"], -row["point_diff"], row["player"].casefold()))
