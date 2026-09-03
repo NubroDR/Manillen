@@ -1,5 +1,6 @@
 import html
 import json
+import asyncio
 from datetime import date
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from reserve_assignments import (
     required_reserve_count,
     save_reserve_assignments,
 )
+from github_publish import GitHubPublishError, trigger_mirror_workflow
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -381,7 +383,13 @@ app_ui = ui.page_fluid(
         ),
         ui.nav_panel(
             "Geschiedenis",
-            ui.div(ui.h2("Gespeelde dagen"), ui.output_ui("history"), class_="panel"),
+            ui.div(
+                ui.h2("Gespeelde dagen"),
+                ui.input_action_button("publish_mirror", "Publiceer data", class_="btn-primary"),
+                ui.output_ui("publish_status"),
+                ui.output_ui("history"),
+                class_="panel",
+            ),
         ),
         ui.nav_panel(
             "Paringen",
@@ -413,6 +421,8 @@ def server(input: Inputs, output: Outputs, session: Session):
     history_refresh = reactive.Value(0)
     score_refresh = reactive.Value(0)
     score_message = reactive.Value[tuple[str, str] | None](None)
+    publish_message = reactive.Value[tuple[str, str] | None](None)
+    publish_running = reactive.Value(False)
     reserve_message = reactive.Value[tuple[str, str] | None](None)
     delete_clicks = reactive.Value[dict[str, int]]({})
     pending_delete = reactive.Value[str | None](None)
@@ -511,6 +521,39 @@ def server(input: Inputs, output: Outputs, session: Session):
     def history():
         history_refresh()
         return _history_cards()
+
+    @render.ui
+    def publish_status():
+        message = publish_message()
+        if not message:
+            return ui.HTML("")
+        kind, text = message
+        return ui.div(text, class_=f"status {'error-status' if kind == 'error' else ''}")
+
+    @reactive.effect
+    @reactive.event(input.publish_mirror)
+    async def publish_mirror():
+        if publish_running():
+            return
+        publish_running.set(True)
+        publish_message.set(("running", "Publiceren..."))
+        ui.update_action_button("publish_mirror", label="Publiceren...", disabled=True)
+        try:
+            await asyncio.to_thread(trigger_mirror_workflow)
+            publish_message.set((
+                "success",
+                "Publicatie gestart. GitHub Actions verwerkt de update.",
+            ))
+        except GitHubPublishError as error:
+            publish_message.set(("error", str(error)))
+        except Exception:
+            publish_message.set((
+                "error",
+                "GitHub-publicatie mislukt door een onverwachte fout.",
+            ))
+        finally:
+            publish_running.set(False)
+            ui.update_action_button("publish_mirror", label="Publiceer data", disabled=False)
 
     @render.ui
     def pairings():

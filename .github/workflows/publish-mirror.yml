@@ -1,0 +1,45 @@
+name: Publish Manillen mirror
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish-mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install mirror tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r mirror_app/requirements.txt shinylive
+
+      - name: Publish mirror
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_WORKFLOW: publish-mirror.yml
+          GITHUB_REF: ${{ github.ref_name }}
+        run: python publish_mirror.py
+
+      - name: Commit and push mirror update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs mirror_app/data
+          if git diff --cached --quiet; then
+            echo "No mirror changes to commit."
+          else
+            git commit -m "Update public Manillen mirror"
+            git push
+          fi
