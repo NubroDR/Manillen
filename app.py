@@ -127,18 +127,45 @@ def _standings_table(play_date=None):
     rows = compute_standings(str(SCORES_FILE), play_date)
     if not rows:
         return ui.div("Nog geen scores ingevoerd.", class_="empty-state")
+
+    medal_classes = {0: "rank-gold", 1: "rank-silver", 2: "rank-bronze"}
+    medal_emojis = {0: "🥇", 1: "🥈", 2: "🥉"}
+    active_indices = [i for i, row in enumerate(rows) if row["games_played"] > 0]
+    last_active_index = active_indices[-1] if active_indices else None
+
+    table_rows = []
+    for index, row in enumerate(rows):
+        row_classes = []
+        emoji = ""
+        if index in medal_classes:
+            row_classes.append(medal_classes[index])
+            emoji = medal_emojis[index]
+        elif index == last_active_index:
+            row_classes.append("rank-lantern")
+            emoji = "🏮"
+
+        player_display = f"{emoji} {row['player']}" if emoji else row["player"]
+        tr_kwargs = {"class_": " ".join(row_classes)} if row_classes else {}
+
+        table_rows.append(
+            ui.tags.tr(
+                ui.tags.td(str(index + 1)),
+                ui.tags.td(player_display),
+                ui.tags.td(str(row["wins"])),
+                ui.tags.td(str(row["games_played"])),
+                ui.tags.td(str(row["points_for"])),
+                ui.tags.td(str(row["points_against"])),
+                ui.tags.td(str(row["point_diff"]), class_="pair-count"),
+                **tr_kwargs,
+            )
+        )
+
     return ui.tags.table(
         ui.tags.thead(ui.tags.tr(
             ui.tags.th("#"), ui.tags.th("Speler"), ui.tags.th("Gewonnen"),
             ui.tags.th("Gespeeld"), ui.tags.th("Voor"), ui.tags.th("Tegen"), ui.tags.th("Saldo")
         )),
-        ui.tags.tbody(*[
-            ui.tags.tr(
-                ui.tags.td(str(index)), ui.tags.td(row["player"]), ui.tags.td(str(row["wins"])),
-                ui.tags.td(str(row["games_played"])), ui.tags.td(str(row["points_for"])),
-                ui.tags.td(str(row["points_against"])), ui.tags.td(str(row["point_diff"]), class_="pair-count")
-            ) for index, row in enumerate(rows, start=1)
-        ]),
+        ui.tags.tbody(*table_rows),
         class_="pairings-table standings-table",
     )
 

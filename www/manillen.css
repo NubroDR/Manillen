@@ -112,6 +112,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, .nav-link:focus
 .danger-button:hover { background: #f8e7e3; }
 
 .pairings-table, .data-table { width: 100%; border-collapse: collapse; background: var(--panel); }
+.standings-table tr.rank-gold, .data-table tr.rank-gold { background: #fbe9c9; }
+.standings-table tr.rank-silver, .data-table tr.rank-silver { background: #e9edf0; }
+.standings-table tr.rank-bronze, .data-table tr.rank-bronze { background: #f0ddca; }
+.standings-table tr.rank-lantern, .data-table tr.rank-lantern { background: #f8e0dd; }
 .pairings-table th, .pairings-table td, .data-table th, .data-table td { padding: 12px 13px; border-bottom: 1px solid var(--line); text-align: left; }
 .pairings-table th, .data-table th { color: var(--teal); font-family: 'Space Grotesk', sans-serif; white-space: nowrap; }
 .pairings-table th:last-child, .pairings-table .pair-count, .data-table .numeric { text-align: right; font-weight: 700; }
