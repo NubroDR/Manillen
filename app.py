@@ -309,6 +309,7 @@ history_choices = _history_dates()
 
 app_ui = ui.page_fluid(
     ui.tags.head(
+        ui.tags.meta(name="viewport", content="width=device-width, initial-scale=1"),
         ui.tags.title("Manillen | Speeldagen"),
         ui.tags.style(APP_CSS)
     ),

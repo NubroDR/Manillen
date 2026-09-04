@@ -111,7 +111,7 @@ def _standings_view(play_date=None):
 
 
 def _pairings_view(selected_player=""):
-    rows = load_pairing_counts(PAIRINGS_FILE)
+    rows = [row for row in load_pairing_counts(PAIRINGS_FILE) if row[2] > 0]
     if selected_player:
         rows = [row for row in rows if selected_player.casefold() in row[0].casefold() or selected_player.casefold() in row[1].casefold()]
     rows.sort(key=lambda row: (-row[2], row[0].casefold(), row[1].casefold()))
