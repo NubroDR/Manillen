@@ -9,3 +9,8 @@ services:
       - "8080:8000"
     volumes:
       - /volume1/manillen_data:/app/data
+    environment:
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GITHUB_REPOSITORY: ${GITHUB_REPOSITORY}
+      GITHUB_WORKFLOW: ${GITHUB_WORKFLOW:-publish-mirror.yml}
+      GITHUB_REF: ${GITHUB_REF:-main}
