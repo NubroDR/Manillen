@@ -549,7 +549,14 @@ def server(input: Inputs, output: Outputs, session: Session):
         publish_message.set(("running", "Publiceren..."))
         ui.update_action_button("publish_mirror", label="Publiceren...", disabled=True)
         try:
-            await asyncio.to_thread(trigger_mirror_workflow)
+            play_date = input.score_date()
+            if play_date:
+                save_reserve_assignments(
+                    play_date,
+                    current_reserve_assignments(play_date),
+                    RESERVE_ASSIGNMENTS_FILE,
+                )
+            await asyncio.to_thread(trigger_mirror_workflow, DATA_DIR)
             publish_message.set((
                 "success",
                 "Publicatie gestart. GitHub Actions verwerkt de update.",
