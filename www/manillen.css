@@ -94,8 +94,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, .nav-link:focus
 .tables-grid, .history-tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-2); }
 .table-card, .history-table { padding: var(--space-3); border: 1px solid var(--line); border-left: 3px solid var(--gold); background: var(--panel); border-radius: var(--radius); }
 .table-title, .history-table-title { margin-bottom: var(--space-2); font-weight: 700; }
-.player-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-1); }
-.player-chip { display: flex; align-items: center; min-height: 42px; padding: 10px 8px; border: 1px solid #c8ddd5; background: #e6f0ec; font-weight: 500; }
+.player-grid { display: grid; grid-template-columns: 1fr; gap: var(--space-1); }.player-chip { display: flex; align-items: center; min-height: 42px; padding: 10px 8px; border: 1px solid #c8ddd5; background: #e6f0ec; font-weight: 500; }
 .player-chip.reserve { border-color: #ecd49b; background: #fff0cf; color: #805d1d; }
 .configuration { margin-top: var(--space-3); }
 .alternative { margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--line); }
