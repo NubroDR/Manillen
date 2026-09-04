@@ -47,7 +47,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, .nav-link:focus
 .app-shell {
   width: min(1180px, 100%);
   margin: 0 auto;
-  padding: var(--space-5) 24px 72px;
+  padding: 132px 24px 72px;
 }
 .intro { margin-bottom: var(--space-4); }
 .intro h1 { max-width: 720px; margin: 10px 0 var(--space-2); font-size: clamp(2.2rem, 5vw, 4.4rem); line-height: 1; }
@@ -132,7 +132,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, .nav-link:focus
 .empty-state { padding: var(--space-2) 0; color: var(--muted); }
 
 .mirror-navigation-group { position: relative; z-index: 1001; }
-.mirror-navigation-group + .app-shell { padding-top: calc(var(--space-5) + 108px); }
+.mirror-navigation-group + .app-shell { padding-top: 132px; }
 .mobile-nav-bar { display: flex; position: fixed; inset: 0 0 auto; z-index: 1001; justify-content: space-between; align-items: center; min-height: 58px; padding: 0 max(24px, calc((100% - 1180px) / 2 + 24px)); background: rgba(244, 241, 234, .97); border-bottom: 1px solid var(--line); box-shadow: 0 5px 14px rgba(24, 35, 43, .08); }
 .mobile-nav-brand { color: var(--teal); font-family: 'Space Grotesk', sans-serif; font-size: 1.15rem; font-weight: 700; }
 .mobile-nav-toggle { display: none; }
