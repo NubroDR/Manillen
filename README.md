@@ -95,6 +95,8 @@ De volledige NAS-app en de publieke mirror zijn aparte deployments. De Docker-co
 
 In de NAS-app staat in het tabblad Geschiedenis de knop **Publiceer data**. Deze knop start alleen de GitHub Actions-workflow via GitHub’s `workflow_dispatch` API. De workflow voert daarna zelf `publish_mirror.py` uit, commit de nieuwe snapshot en werkt GitHub Pages bij. Een succesmelding betekent dus alleen dat de workflow is gestart; GitHub Pages kan daarna nog enige tijd nodig hebben.
 
+De publieke projectsite staat op `https://nubrodr.github.io/Manillen/`. De URL `https://nubrodr.github.io/` is alleen de gebruikerssite van GitHub en verwijst niet automatisch naar deze repository.
+
 Stel in Portainer de volgende environment variables in voor de container:
 
 - `GITHUB_TOKEN`: verplicht; een token met voldoende rechten om de geconfigureerde workflow te dispatchen.
@@ -124,7 +126,7 @@ git push
 
 Het script kopieert `data/pairings.csv`, `data/pairings_history.csv`, `data/scores_history.csv` en `data/reserve_assignments.csv` indien aanwezig naar `mirror_app/data/`, en voert `shinylive export mirror_app docs` uit. De mirror gebruikt de reserve-snapshot om ingevulde reservenamen in de geschiedenis te tonen. Git-commando’s blijven bewust handmatig.
 
-Stel GitHub Pages in via **Settings > Pages > Build and deployment**. Kies **Deploy from a branch**, selecteer de publicatiebranch en kies als map **`/docs`**.
+GitHub Pages wordt gedeployed door `.github/workflows/deploy-pages.yml`. Na een push naar `main` is de publieke projectsite beschikbaar op `https://nubrodr.github.io/Manillen/`.
 
 Lokaal testen kan met:
 

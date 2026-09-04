@@ -20,4 +20,4 @@ python publish_mirror.py
 
 Het script kopieert de actuele snapshots, voert `shinylive export mirror_app docs` uit en toont het exportpad. Publiceer daarna bewust zelf met `git add`, `git commit` en `git push`.
 
-Stel in GitHub in via **Settings > Pages > Build and deployment**: kies **Deploy from a branch**, selecteer de publicatiebranch en als map **`/docs`**.
+De GitHub Pages-deployment wordt uitgevoerd door `.github/workflows/deploy-pages.yml`. De publieke projectsite staat op `https://nubrodr.github.io/Manillen/`.
