@@ -375,7 +375,7 @@ app_ui = ui.page_fluid(
             ),
         ),
         ui.nav_panel(
-            "Geschiedenis",
+            "Speeldagen",
             ui.div(
                 ui.h2("Speeldagen"),
                 ui.input_action_button("publish_mirror", "Publiceer data", class_="btn-primary"),

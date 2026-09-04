@@ -60,6 +60,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, .nav-link:focus
   margin-bottom: var(--space-4);
   border-bottom: 1px solid var(--line);
   overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: thin;
 }
 .nav-tabs .nav-link { flex: 0 0 auto; padding: 12px 15px; color: var(--muted); font-weight: 700; white-space: nowrap; }
@@ -140,6 +141,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, .nav-link:focus
 .hamburger-icon { display: block; position: relative; width: 22px; height: 16px; border-top: 2px solid currentColor; border-bottom: 2px solid currentColor; }
 .hamburger-icon::after { content: ''; position: absolute; top: 5px; left: 0; right: 0; border-top: 2px solid currentColor; }
 .mirror-navigation-group > .nav-tabs { position: fixed; top: 58px; left: 0; right: 0; z-index: 1000; padding: 0 max(24px, calc((100% - 1180px) / 2 + 24px)); background: rgba(244, 241, 234, .97); }
+.mirror-navigation-group > .tab-content { padding-top: 107px; }
 
 @media (max-width: 760px) {
   .app-shell { padding: var(--space-4) 14px 52px; }
@@ -163,6 +165,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, .nav-link:focus
   .mirror-navigation-group .nav-tabs::before { display: none; }
   .mirror-navigation-group > .nav-tabs { display: none; position: fixed; top: 52px; left: 14px; right: 14px; z-index: 1000; margin: 0; padding: 0; overflow: visible; background: transparent; }
   .mirror-navigation-group.is-open > .nav-tabs { display: flex; flex-direction: column; flex-wrap: nowrap; padding: 6px 0; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 8px 20px rgba(24, 35, 43, .16); }
+  .mirror-navigation-group > .tab-content { padding-top: 52px; }
   .mirror-navigation-group .nav-tabs .nav-link { width: 100%; min-height: 46px; padding: 13px 12px; white-space: normal; }
   .table-scroll { width: 100%; overflow-x: auto; }
   .data-table { min-width: 560px; }

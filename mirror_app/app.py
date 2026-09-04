@@ -79,12 +79,12 @@ def _scores_view(play_date=None):
         return ui.div("Nog geen scores gevonden.", class_="empty-state")
     return ui.div(ui.tags.table(
         ui.tags.thead(ui.tags.tr(
-            ui.tags.th("Tafel"), ui.tags.th("Spel"), ui.tags.th("Team 1"),
+            ui.tags.th("Datum"), ui.tags.th("Tafel"), ui.tags.th("Spel"), ui.tags.th("Team 1"),
             ui.tags.th("Score"), ui.tags.th("Team 2"), ui.tags.th("Score"),
         )),
         ui.tags.tbody(*[
             ui.tags.tr(
-                ui.tags.td(str(row["Table"])), ui.tags.td(str(row["Game"])),
+                ui.tags.td(str(row["Date"])), ui.tags.td(str(row["Table"])), ui.tags.td(str(row["Game"])),
                 ui.tags.td(row["Team1Players"].replace("|", " + ")),
                 ui.tags.td(str(row["Team1Score"]), class_="numeric"),
                 ui.tags.td(row["Team2Players"].replace("|", " + ")),
@@ -144,11 +144,11 @@ app_ui = ui.page_fluid(
             class_="mobile-nav-bar",
         ),
         ui.navset_tab(
-            ui.nav_panel("Geschiedenis", ui.div(ui.h2("Speeldagen"), ui.output_ui("history"), class_="panel")),
-            ui.nav_panel("Scores", ui.div(ui.h2("Scores"), ui.input_select("scores_date", "Speeldag", {"": "Alle speeldagen", **history_choices}), ui.output_ui("scores"), class_="panel")),
             ui.nav_panel("Tussenstand", ui.div(ui.h2("Tussenstand"), ui.input_select("standings_date", "Periode", {"": "Alle speeldagen (cumulatief)", **history_choices}), ui.output_ui("standings"), class_="panel")),
+            ui.nav_panel("Speeldagen", ui.div(ui.h2("Speeldagen"), ui.output_ui("history"), class_="panel")),
+            ui.nav_panel("Scores", ui.div(ui.h2("Scores"), ui.input_select("scores_date", "Speeldag", {"": "Alle speeldagen", **history_choices}), ui.output_ui("scores"), class_="panel")),
             ui.nav_panel("Parenhistoriek", ui.div(ui.h2("Parenhistoriek"), ui.input_selectize("pairing_player", "Zoek speler", choices={"": "Alle spelers", **{player: player for player in players}}, selected="", options={"placeholder": "Typ een naam...", "allowEmptyOption": True}), ui.output_ui("pairings"), class_="panel")),
-            id="tabs",
+            id="tabs", selected="Tussenstand",
         ),
         ui.tags.script("""
             (() => {
@@ -177,7 +177,7 @@ app_ui = ui.page_fluid(
     ui.div(
         ui.div("MANILLEN / PUBLIEKE MIRROR", class_="eyebrow"),
         ui.h1("Manillen before dark: de speeldagen, helder bijgehouden."),
-        ui.p("Een actuele, alleen-lezen momentopname van geschiedenis, tussenstand en parenhistoriek."),
+        ui.p("Een actuele, alleen-lezen momentopname van speeldagen, tussenstand en parenhistoriek."),
         class_="intro",
     ),
     class_="app-shell",
