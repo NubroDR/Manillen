@@ -110,20 +110,25 @@ def _scores_view(play_date=None, selected_player=""):
         ]
     if not rows:
         return ui.div("Nog geen scores gevonden.", class_="empty-state")
+
+    table_rows = []
+    for row in rows:
+        team1_score, team2_score = row["Team1Score"], row["Team2Score"]
+        team1_won = team1_score > team2_score
+        table_rows.append(ui.tags.tr(
+            ui.tags.td(str(row["Date"])), ui.tags.td(str(row["Table"])), ui.tags.td(str(row["Game"])),
+            ui.tags.td(row["Team1Players"].replace("|", " + "), class_="numeric score-winner" if team1_won else "numeric score-loser"),
+            ui.tags.td(str(team1_score), class_="numeric score-winner" if team1_won else "numeric score-loser"),
+            ui.tags.td(row["Team2Players"].replace("|", " + "), class_="numeric score-loser" if team1_won else "numeric score-winner"),
+            ui.tags.td(str(team2_score), class_="numeric score-loser" if team1_won else "numeric score-winner"),
+        ))
+
     return ui.div(ui.tags.table(
         ui.tags.thead(ui.tags.tr(
             ui.tags.th("Datum"), ui.tags.th("Tafel"), ui.tags.th("Spel"), ui.tags.th("Team 1"),
             ui.tags.th("Score"), ui.tags.th("Team 2"), ui.tags.th("Score"),
         )),
-        ui.tags.tbody(*[
-            ui.tags.tr(
-                ui.tags.td(str(row["Date"])), ui.tags.td(str(row["Table"])), ui.tags.td(str(row["Game"])),
-                ui.tags.td(row["Team1Players"].replace("|", " + ")),
-                ui.tags.td(str(row["Team1Score"]), class_="numeric"),
-                ui.tags.td(row["Team2Players"].replace("|", " + ")),
-                ui.tags.td(str(row["Team2Score"]), class_="numeric"),
-            ) for row in rows
-        ]), class_="data-table"
+        ui.tags.tbody(*table_rows), class_="data-table"
     ), class_="table-scroll")
 
 def _standings_view(play_date=None):

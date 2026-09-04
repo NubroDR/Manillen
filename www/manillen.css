@@ -119,6 +119,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, .nav-link:focus
 .pairings-table th, .pairings-table td, .data-table th, .data-table td { padding: 12px 13px; border-bottom: 1px solid var(--line); text-align: left; }
 .pairings-table th, .data-table th { color: var(--teal); font-family: 'Space Grotesk', sans-serif; white-space: nowrap; }
 .pairings-table th:last-child, .pairings-table .pair-count, .data-table .numeric { text-align: left; font-weight: 700; }
+.data-table .score-winner { color: var(--ink); }
+.data-table .score-loser { color: var(--muted); font-weight: 400; }
 .table-scroll { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .data-table { min-width: 520px; }
 
