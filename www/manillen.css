@@ -141,7 +141,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, .nav-link:focus
 .hamburger-icon { display: block; position: relative; width: 22px; height: 16px; border-top: 2px solid currentColor; border-bottom: 2px solid currentColor; }
 .hamburger-icon::after { content: ''; position: absolute; top: 5px; left: 0; right: 0; border-top: 2px solid currentColor; }
 .mirror-navigation-group > .nav-tabs { position: fixed; top: 58px; left: 0; right: 0; z-index: 1000; padding: 0 max(24px, calc((100% - 1180px) / 2 + 24px)); background: rgba(244, 241, 234, .97); }
-.mirror-navigation-group > .tab-content { padding-top: 107px; }
 
 @media (max-width: 760px) {
   .app-shell { padding: var(--space-4) 14px 52px; }
