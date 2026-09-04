@@ -20,6 +20,10 @@ STYLE_SOURCE = ROOT / "www" / "manillen.css"
 PAGE_TITLE = "Manillen | Publieke mirror"
 FAVICON_NAME = "favicon.ico"
 FAVICON_SOURCE = ROOT / "www" / FAVICON_NAME
+PAGE_TITLE = "Manillen | Publieke mirror"
+PAGE_DESCRIPTION = "Publieke mirror van de Manillen-app."
+PAGE_URL = "https://nubrodr.github.io/Manillen/"
+PAGE_IMAGE = "https://nubrodr.github.io/Manillen/images/android-chrome-512x512.png"
 
 
 def _shinylive_command():
@@ -41,10 +45,35 @@ def _shinylive_command():
 def _set_page_title():
     index_file = OUTPUT / "index.html"
     content = index_file.read_text(encoding="utf-8")
-    content = content.replace("<title>Shiny App</title>", f"<title>{PAGE_TITLE}</title>")
-    favicon_link = f'<link rel="icon" href="./{FAVICON_NAME}" type="image/x-icon" />'
+
+    # Browser tab title
+    content = content.replace(
+        "<title>Shiny App</title>",
+        f"<title>{PAGE_TITLE}</title>"
+    )
+
+    # Open Graph metadata for link previews
+    og_tags = f"""
+    <meta property="og:title" content="{PAGE_TITLE}" />
+    <meta property="og:description" content="{PAGE_DESCRIPTION}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="{PAGE_URL}" />
+    <meta property="og:image" content="{PAGE_IMAGE}" />
+    """
+
+    if 'property="og:title"' not in content:
+        content = content.replace("</head>", f"{og_tags}\n  </head>")
+
+    # Favicon
+    favicon_link = (
+        f'<link rel="icon" href="./{FAVICON_NAME}" type="image/x-icon" />'
+    )
     if favicon_link not in content:
-        content = content.replace("</head>", f"    {favicon_link}\n  </head>")
+        content = content.replace(
+            "</head>",
+            f"    {favicon_link}\n  </head>"
+        )
+
     index_file.write_text(content, encoding="utf-8")
 
 
