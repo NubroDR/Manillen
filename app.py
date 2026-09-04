@@ -311,6 +311,7 @@ app_ui = ui.page_fluid(
     ui.tags.head(
         ui.tags.meta(name="viewport", content="width=device-width, initial-scale=1"),
         ui.tags.title("Manillen | Speeldagen"),
+        ui.tags.link(rel="icon", href="favicon.ico", type="image/x-icon"),
         ui.tags.style(APP_CSS)
     ),
     ui.div(
