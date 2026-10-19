@@ -295,7 +295,9 @@ def _closed_tool_awards():
 
 
 def _seasons_view():
-    legacy = load_legacy_seasons(LEGACY_SEASONS_FILE, LEGACY_PLAYDAYS_FILE)
+    legacy = load_legacy_seasons(
+        LEGACY_SEASONS_FILE, LEGACY_PLAYDAYS_FILE, pool_players
+    )
     rows = [
         (
             f"S{row['SeasonNumber']}",
@@ -349,7 +351,7 @@ def _seasons_view():
         ui.tags.table(
             ui.tags.thead(ui.tags.tr(
                 ui.tags.th("Seizoen"), ui.tags.th("Label"), ui.tags.th("Pool"),
-                ui.tags.th("Beker"), ui.tags.th("Zilver"), ui.tags.th("Brons"),
+                ui.tags.th("Goud"), ui.tags.th("Zilver"), ui.tags.th("Brons"),
                 ui.tags.th("Rode lantaarn"), ui.tags.th("Speeldagen"),
             )),
             ui.tags.tbody(*table_rows),
@@ -376,10 +378,10 @@ def _hall_of_fame_view():
             ui.tags.tbody(*[
                 ui.tags.tr(
                     ui.tags.td(html.escape(row["Player"])),
-                    ui.tags.td(str(row["Gold"]), class_="numeric"),
-                    ui.tags.td(str(row["Silver"]), class_="numeric"),
-                    ui.tags.td(str(row["Bronze"]), class_="numeric"),
-                    ui.tags.td(str(row["RedLantern"]), class_="numeric"),
+                    ui.tags.td(f"🥇 {row['Gold']}", class_="numeric rank-gold"),
+                    ui.tags.td(f"🥈 {row['Silver']}", class_="numeric rank-silver"),
+                    ui.tags.td(f"🥉 {row['Bronze']}", class_="numeric rank-bronze"),
+                    ui.tags.td(f"🏮 {row['RedLantern']}", class_="numeric rank-lantern"),
                 )
                 for row in rows
             ]),

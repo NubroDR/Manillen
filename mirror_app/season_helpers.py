@@ -234,7 +234,7 @@ def _canonical_player(name, pool_names):
     return shortened if shortened != clean else clean
 
 
-def load_legacy_seasons(seasons_path, playdays_path=None):
+def load_legacy_seasons(seasons_path, playdays_path=None, pool_players=None):
     path = Path(seasons_path)
     playdays_by_season = {}
     if playdays_path and Path(playdays_path).exists():
@@ -251,11 +251,24 @@ def load_legacy_seasons(seasons_path, playdays_path=None):
                 number = int(row.get("SeasonNumber", ""))
             except (TypeError, ValueError):
                 continue
+            awards = {
+                field: (row.get(field) or "").strip()
+                for field in AWARD_FIELDS
+            }
+            if pool_players is not None:
+                awards = {
+                    field: " | ".join(
+                        _canonical_player(name.strip(), pool_players)
+                        for name in awards[field].split("|")
+                        if name.strip()
+                    )
+                    for field in AWARD_FIELDS
+                }
             result.append({
                 "Season": (row.get("Season") or "").strip(),
                 "SeasonNumber": number,
                 "Pool": pool_size,
-                **{field: (row.get(field) or "").strip() for field in AWARD_FIELDS},
+                **awards,
                 "Playdays": playdays_by_season.get((row.get("Season") or "").strip(), []),
             })
     return result

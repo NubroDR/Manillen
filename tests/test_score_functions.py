@@ -2,7 +2,7 @@ import csv
 
 import pytest
 
-from score_functions import save_game_score
+from score_functions import save_game_score, save_game_scores
 
 
 HEADER = [
@@ -38,6 +38,45 @@ def test_game_save_is_idempotent_and_edit_replaces_only_same_game(tmp_path):
     assert len(rows) == 1
     assert rows[0]["Team1Score"] == "30"
     assert rows[0]["Team2Score"] == "101"
+
+
+def test_batch_game_save_replaces_submitted_games_and_preserves_others(tmp_path):
+    path = tmp_path / "scores.csv"
+    save_game_score("2026-09-19", 1, 1, ["An", "Bruno"], ["Etienne", "Freddy"], 101, 20, path)
+    save_game_score("2026-09-19", 1, 2, ["An", "Etienne"], ["Bruno", "Freddy"], 101, 20, path)
+    save_game_scores("2026-09-19", [{
+        "table": 1,
+        "game": 1,
+        "team1": ["An", "Bruno"],
+        "team2": ["Etienne", "Freddy"],
+        "team1_score": 30,
+        "team2_score": 101,
+    }], path)
+
+    rows = read_rows(path)
+
+    assert [(row["Game"], row["Team1Score"]) for row in rows] == [
+        ("1", "30"),
+        ("2", "101"),
+    ]
+
+
+def test_batch_game_save_validates_every_game_before_writing(tmp_path):
+    path = tmp_path / "scores.csv"
+    valid_game = {
+        "table": 1,
+        "game": 1,
+        "team1": ["An", "Bruno"],
+        "team2": ["Etienne", "Freddy"],
+        "team1_score": 101,
+        "team2_score": 20,
+    }
+    invalid_game = {**valid_game, "game": 2, "team1_score": -1}
+
+    with pytest.raises(ValueError):
+        save_game_scores("2026-09-19", [valid_game, invalid_game], path)
+
+    assert not path.exists()
 
 
 @pytest.mark.parametrize(

@@ -16,6 +16,7 @@ from mirror_app.season_helpers import (
     ensure_season_data,
     get_active_season,
     load_seasons,
+    load_legacy_seasons,
     migrate_pairing_history,
     next_season_values,
     reopen_season,
@@ -143,6 +144,28 @@ def test_tool_awards_use_only_eligible_pool_players_and_allow_overlap():
     awards = compute_tool_awards(standings, ["An", "Bruno", "Etienne"])
     assert awards == {"Gold": "An", "Silver": "Bruno", "RedLantern": "Bruno"}
     assert "Reserve 1*" not in awards.values()
+
+
+def test_legacy_season_awards_can_be_canonicalized_to_the_player_pool(tmp_path):
+    seasons = tmp_path / "seasons_history.csv"
+    write_csv(seasons, [
+        "Season", "SeasonNumber", "Pool", "Gold", "Silver", "Bronze", "RedLantern",
+    ], [{
+        "Season": "2024-2025",
+        "SeasonNumber": 10,
+        "Pool": 4,
+        "Gold": "Gilbert W",
+        "Silver": "Marc G",
+        "Bronze": "Gilbert W | Marc G",
+        "RedLantern": "José B",
+    }])
+
+    rows = load_legacy_seasons(seasons, pool_players=["Gilbert", "Marc", "José"])
+
+    assert rows[0]["Gold"] == "Gilbert"
+    assert rows[0]["Silver"] == "Marc"
+    assert rows[0]["Bronze"] == "Gilbert | Marc"
+    assert rows[0]["RedLantern"] == "José"
 
 
 def test_closed_season_awards_are_derived_from_scores_and_exclude_reserves(tmp_path):

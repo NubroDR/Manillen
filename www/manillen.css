@@ -116,6 +116,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, .nav-link:focus
 .standings-table tr.rank-silver, .data-table tr.rank-silver { background: #e9edf0; }
 .standings-table tr.rank-bronze, .data-table tr.rank-bronze { background: #f0ddca; }
 .standings-table tr.rank-lantern, .data-table tr.rank-lantern { background: #f8e0dd; }
+.data-table td.rank-gold { background: #fbe9c9; }
+.data-table td.rank-silver { background: #e9edf0; }
+.data-table td.rank-bronze { background: #f0ddca; }
+.data-table td.rank-lantern { background: #f8e0dd; }
 .pairings-table th, .pairings-table td, .data-table th, .data-table td { padding: 12px 13px; border-bottom: 1px solid var(--line); text-align: left; }
 .pairings-table th, .data-table th { color: var(--teal); font-family: 'Space Grotesk', sans-serif; white-space: nowrap; }
 .pairings-table th:last-child, .pairings-table .pair-count, .data-table .numeric { text-align: left; font-weight: 700; }
@@ -129,6 +133,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, .nav-link:focus
 .score-table-card h3 { margin-bottom: var(--space-2); }
 .score-game { display: grid; grid-template-columns: 70px minmax(140px, 1fr) 100px 32px 100px minmax(140px, 1fr); align-items: center; gap: var(--space-2); margin: var(--space-1) 0; padding: var(--space-2); background: var(--surface); }
 .score-game .form-group { margin: 0; }
+.score-save-button { margin-top: var(--space-3); }
 .score-game-title { font-weight: 700; }
 .score-team { font-weight: 500; }
 .score-vs { color: var(--muted); text-align: center; font-weight: 700; }

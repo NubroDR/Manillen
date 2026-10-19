@@ -34,7 +34,7 @@ Kortom: als een wijziging "groot" is, dan is een README-update verplicht. Als ee
 - Excel-scorebladen genereren vanuit een opgeslagen speeldag, met alleen het benodigde aantal reservevelden.
 - Reservenamen per speeldag opslaan en automatisch opnieuw laden; reserves krijgen een afwijkende Excel-stijl.
 - Scores voor de drie 2v2-spellen per tafel invoeren.
-- Scores per spel opslaan, ook als de rest van de speeldag nog niet is ingevuld.
+- Alle ingevulde scores voor een speeldag met één knop opslaan; onvolledige spellen worden overgeslagen met een melding.
 - Een tussenstand en speeldaggeschiedenis bekijken met een seizoensfilter.
 - Historische seizoenen en de Hall of Fame bekijken.
 - Een alleen-lezen Shinylive-app publiceren naar GitHub Pages.
@@ -107,7 +107,7 @@ De tests zetten `MANILLEN_DATA_DIR` naar een tijdelijke map. `tests/`, `requirem
 
 De indeling gebruikt een greedy-algoritme. Het algoritme probeert meerdere startvolgordes, vormt telkens de best mogelijke groep van vier en minimaliseert eerst de meest herhaalde paring in de configuratie. Daarna gebruikt het het aantal herhaalde paringen en de totale paringtelling als tie-breakers. Reservespelers worden toegevoegd wanneer het aantal aanwezigen geen veelvoud van vier is; twee reservespelers komen niet samen aan één tafel.
 
-Elke tafel speelt drie unieke 2v2-combinaties. Een spel loopt tot en met 101 punten. In **Scores invoeren** wordt elk spel afzonderlijk opgeslagen; ontbrekende scores voor andere spellen blokkeren dat niet. Opslaan vervangt hetzelfde spel op basis van datum, tafel en spelnummer, zodat herhaald opslaan geen dubbele rij maakt. Een volledig spel vereist twee niet-negatieve gehele scores.
+Elke tafel speelt drie unieke 2v2-combinaties. Een spel loopt tot en met 101 punten. In **Scores invoeren** worden met één knop alle volledige spellen van de geselecteerde speeldag opgeslagen; ontbrekende scores blokkeren de volledige spellen niet en worden gemeld. Opslaan vervangt dezelfde spellen op basis van datum, tafel en spelnummer, zodat herhaald opslaan geen dubbele rij maakt. Een volledig spel vereist twee niet-negatieve gehele scores.
 
 In de tussenstand worden spelers eerst gesorteerd op gewonnen spellen, daarna op aantal gespeelde spellen, vervolgens op puntensaldo en ten slotte op naam. Het puntensaldo is punten voor min punten tegen. De reservekolommen in opgeslagen scores blijven herkenbaar als reserve; de tussenstand toont de per speeldag opgeslagen reservenaam met `*` en vermeldt `* = reservespeler`. Een ingevoerde reservenaam die gelijk is aan een poolspeler geeft een waarschuwing.
 

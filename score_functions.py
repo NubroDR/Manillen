@@ -134,6 +134,72 @@ def save_scores(play_date, table, game_scores, scores_filename=str(DATA_DIR / "s
     return str(path)
 
 
+def save_game_scores(
+    play_date,
+    game_scores,
+    scores_filename=str(DATA_DIR / "scores_history.csv"),
+):
+    """Insert or replace multiple games without touching unsubmitted games."""
+    play_date = _score_date(play_date)
+    if not isinstance(game_scores, (list, tuple)) or not game_scores:
+        raise ValueError("game_scores must contain at least one game")
+
+    new_rows = []
+    replaced_games = set()
+    for score in game_scores:
+        if not isinstance(score, dict):
+            raise ValueError("each game score must be a dictionary")
+        table_value = score.get("table")
+        game_value = score.get("game")
+        if table_value is None or game_value is None:
+            raise ValueError("each game score must contain a table and game")
+        try:
+            table_number = int(table_value)
+            game_number = int(game_value)
+        except (TypeError, ValueError) as error:
+            raise ValueError("table and game must be integers") from error
+        if table_number < 1:
+            raise ValueError("table must be positive")
+        if game_number not in (1, 2, 3):
+            raise ValueError("game must be between 1 and 3")
+        if not score.get("team1") or not score.get("team2"):
+            raise ValueError("each game must contain both teams")
+        key = (str(table_number), str(game_number))
+        if key in replaced_games:
+            raise ValueError("game_scores cannot contain duplicate games")
+        replaced_games.add(key)
+        new_rows.append({
+            "Date": play_date,
+            "Table": str(table_number),
+            "Game": str(game_number),
+            "Team1Players": _team_value(score["team1"]),
+            "Team2Players": _team_value(score["team2"]),
+            "Team1Score": str(_score_value(score.get("team1_score"))),
+            "Team2Score": str(_score_value(score.get("team2_score"))),
+        })
+
+    path = Path(scores_filename)
+    rows = []
+    if path.exists():
+        with path.open("r", encoding="utf-8", newline="") as file:
+            rows = [
+                {header: row.get(header, "") for header in SCORES_HEADER}
+                for row in csv.DictReader(file)
+                if not (
+                    row.get("Date") == play_date
+                    and (row.get("Table"), row.get("Game")) in replaced_games
+                )
+            ]
+    rows.extend(new_rows)
+    rows.sort(key=lambda row: (row["Date"], int(row["Table"]), int(row["Game"])))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=SCORES_HEADER)
+        writer.writeheader()
+        writer.writerows(rows)
+    return str(path)
+
+
 def save_game_score(
     play_date,
     table,
@@ -145,46 +211,15 @@ def save_game_score(
     scores_filename=str(DATA_DIR / "scores_history.csv"),
 ):
     """Insert or replace the score for one game without touching other games."""
-    play_date = _score_date(play_date)
-    try:
-        table_number = int(table)
-        game_number = int(game)
-    except (TypeError, ValueError) as error:
-        raise ValueError("table and game must be integers") from error
-    if table_number < 1:
-        raise ValueError("table must be positive")
-    if game_number not in (1, 2, 3):
-        raise ValueError("game must be between 1 and 3")
-    if not team1 or not team2:
-        raise ValueError("each game must contain both teams")
-
-    new_row = {
-        "Date": play_date,
-        "Table": str(table_number),
-        "Game": str(game_number),
-        "Team1Players": _team_value(team1),
-        "Team2Players": _team_value(team2),
-        "Team1Score": str(_score_value(team1_score)),
-        "Team2Score": str(_score_value(team2_score)),
-    }
-    path = Path(scores_filename)
-    rows = []
-    if path.exists():
-        with path.open("r", encoding="utf-8", newline="") as file:
-            rows = [
-                {header: row.get(header, "") for header in SCORES_HEADER}
-                for row in csv.DictReader(file)
-                if not (
-                    row.get("Date") == play_date
-                    and row.get("Table") == str(table_number)
-                    and row.get("Game") == str(game_number)
-                )
-            ]
-    rows.append(new_row)
-    rows.sort(key=lambda row: (row["Date"], int(row["Table"]), int(row["Game"])))
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="") as file:
-        writer = csv.DictWriter(file, fieldnames=SCORES_HEADER)
-        writer.writeheader()
-        writer.writerows(rows)
-    return str(path)
+    return save_game_scores(
+        play_date,
+        [{
+            "table": table,
+            "game": game,
+            "team1": team1,
+            "team2": team2,
+            "team1_score": team1_score,
+            "team2_score": team2_score,
+        }],
+        scores_filename,
+    )

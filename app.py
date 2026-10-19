@@ -20,7 +20,7 @@ from score_functions import (
     compute_standings,
     get_matchups_for_table,
     load_scores,
-    save_game_score,
+    save_game_scores,
 )
 from mirror_app.data_helpers import load_pairing_counts, load_pairing_history
 from mirror_app.data_helpers import load_pairing_records
@@ -139,7 +139,9 @@ def _closed_tool_awards():
 
 
 def _seasons_overview():
-    legacy = load_legacy_seasons(LEGACY_SEASONS_FILE, LEGACY_PLAYDAYS_FILE)
+    legacy = load_legacy_seasons(
+        LEGACY_SEASONS_FILE, LEGACY_PLAYDAYS_FILE, players
+    )
     rows = [
         (
             f"S{row['SeasonNumber']}",
@@ -192,7 +194,7 @@ def _seasons_overview():
         ui.tags.table(
             ui.tags.thead(ui.tags.tr(
                 ui.tags.th("Seizoen"), ui.tags.th("Label"), ui.tags.th("Pool"),
-                ui.tags.th("Beker"), ui.tags.th("Zilver"), ui.tags.th("Brons"),
+                ui.tags.th("Goud"), ui.tags.th("Zilver"), ui.tags.th("Brons"),
                 ui.tags.th("Rode lantaarn"), ui.tags.th("Speeldagen"),
             )),
             ui.tags.tbody(*table_rows),
@@ -213,10 +215,10 @@ def _hall_of_fame_table():
     table_rows = [
         ui.tags.tr(
             ui.tags.td(html.escape(row["Player"])),
-            ui.tags.td(str(row["Gold"]), class_="numeric"),
-            ui.tags.td(str(row["Silver"]), class_="numeric"),
-            ui.tags.td(str(row["Bronze"]), class_="numeric"),
-            ui.tags.td(str(row["RedLantern"]), class_="numeric"),
+            ui.tags.td(f"🥇 {row['Gold']}", class_="numeric rank-gold"),
+            ui.tags.td(f"🥈 {row['Silver']}", class_="numeric rank-silver"),
+            ui.tags.td(f"🥉 {row['Bronze']}", class_="numeric rank-bronze"),
+            ui.tags.td(f"🏮 {row['RedLantern']}", class_="numeric rank-lantern"),
         )
         for row in rows
     ]
@@ -235,10 +237,6 @@ def _hall_of_fame_table():
 
 def _score_input_id(table, game, team):
     return f"score_t{table}_g{game}_{team}"
-
-
-def _save_game_id(table, game):
-    return f"save_score_t{table}_g{game}"
 
 
 def _scoreblad_file_for_date(play_date):
@@ -274,11 +272,6 @@ def _score_entry_tables(play_date):
                     ui.div("vs", class_="score-vs"),
                     ui.input_numeric(_score_input_id(table, game, "team2"), "Team 2", value=row.get("Team2Score")),
                     ui.div(" + ".join(html.escape(name) for name in display_team2), class_="score-team"),
-                    ui.input_action_button(
-                        _save_game_id(table, game),
-                        "Spel opslaan",
-                        class_="btn-success",
-                    ),
                     class_="score-game",
                 )
             )
@@ -572,8 +565,13 @@ app_ui = ui.page_fluid(
                 ui.h2("Scores invoeren"),
                 ui.input_select("score_entry_date", "Speeldag", history_choices or {"": "Geen historiek beschikbaar"}),
                 ui.output_ui("score_entry_tables"),
+                ui.input_action_button(
+                    "save_scores",
+                    "Wijzigingen opslaan",
+                    class_="btn-success score-save-button",
+                ),
                 ui.output_ui("score_validation"),
-                    ui.output_ui("score_entry_status"),
+                ui.output_ui("score_entry_status"),
                 class_="panel",
             ),
         ),
@@ -1017,58 +1015,68 @@ def server(input: Inputs, output: Outputs, session: Session):
             return ui.HTML("")
         return ui.div(*warnings, class_="score-warning")
 
-    saved_games = reactive.Value[dict[tuple[str, int, int], int]]({})
-
     @reactive.effect
-    def save_game_handlers():
+    @reactive.event(input.save_scores)
+    def save_scores_handler():
         history_refresh()
         play_date = input.score_entry_date()
         if not play_date:
+            score_message.set(("warning", "Selecteer eerst een speeldag."))
             return
-        clicks = saved_games()
+        complete_games = []
+        incomplete_games = 0
         for table_text, table_players in _read_history().get(play_date, []):
             table = int(table_text)
             for game, (team1, team2) in enumerate(
                 get_matchups_for_table(table_players), start=1
             ):
-                key = (play_date, table, game)
-                current = getattr(input, _save_game_id(table, game))() or 0
-                if current <= clicks.get(key, 0):
+                team1_score = getattr(input, _score_input_id(table, game, "team1"))()
+                team2_score = getattr(input, _score_input_id(table, game, "team2"))()
+                if team1_score is None or team2_score is None:
+                    incomplete_games += 1
                     continue
-                saved_games.set({**clicks, key: current})
-                try:
-                    team1_score = getattr(input, _score_input_id(table, game, "team1"))()
-                    team2_score = getattr(input, _score_input_id(table, game, "team2"))()
-                    if team1_score is None or team2_score is None:
-                        raise ValueError("Vul beide scores van dit spel in.")
-                    if (
-                        team1_score < 0
-                        or team2_score < 0
-                        or int(team1_score) != team1_score
-                        or int(team2_score) != team2_score
-                    ):
-                        raise ValueError("Scores moeten niet-negatieve gehele getallen zijn.")
-                    save_game_score(
-                        play_date,
-                        table,
-                        game,
-                        team1,
-                        team2,
-                        int(team1_score),
-                        int(team2_score),
-                        str(SCORES_FILE),
-                    )
-                    score_refresh.set(score_refresh() + 1)
-                    score_message.set((
-                        "success",
-                        f"Score voor tafel {table}, spel {game} is opgeslagen.",
-                    ))
-                except Exception as error:
+                if (
+                    team1_score < 0
+                    or team2_score < 0
+                    or int(team1_score) != team1_score
+                    or int(team2_score) != team2_score
+                ):
                     score_message.set((
                         "error",
-                        f"Opslaan van tafel {table}, spel {game} mislukt: {error}",
+                        f"Tafel {table}, spel {game}: scores moeten niet-negatieve gehele getallen zijn.",
                     ))
-                clicks = saved_games()
+                    return
+                complete_games.append({
+                    "table": table,
+                    "game": game,
+                    "team1": team1,
+                    "team2": team2,
+                    "team1_score": int(team1_score),
+                    "team2_score": int(team2_score),
+                })
+
+        if not complete_games:
+            score_message.set((
+                "warning",
+                "Er zijn geen volledige spellen om op te slaan. Vul beide scores per spel in.",
+            ))
+            return
+        try:
+            save_game_scores(play_date, complete_games, str(SCORES_FILE))
+        except (OSError, ValueError) as error:
+            score_message.set(("error", f"Scores opslaan mislukt: {error}"))
+            return
+        score_refresh.set(score_refresh() + 1)
+        if incomplete_games:
+            saved_label = "spel" if len(complete_games) == 1 else "spellen"
+            skipped_label = "spel" if incomplete_games == 1 else "spellen"
+            score_message.set((
+                "warning",
+                f"{len(complete_games)} {saved_label} opgeslagen; "
+                f"{incomplete_games} onvolledige {skipped_label} overgeslagen.",
+            ))
+        else:
+            score_message.set(("success", "Alle scores zijn opgeslagen."))
 
     @render.ui
     def score_entry_status():
@@ -1076,7 +1084,11 @@ def server(input: Inputs, output: Outputs, session: Session):
         if not message:
             return ui.HTML("")
         kind, text = message
-        return ui.div(text, class_=f"status {'error-status' if kind == 'error' else ''}")
+        status_class = {
+            "error": "status error-status",
+            "warning": "status score-warning",
+        }.get(kind, "status")
+        return ui.div(text, class_=status_class)
 
     @render.ui
     def standings():
