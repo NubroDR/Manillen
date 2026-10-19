@@ -4,7 +4,7 @@ Een Shiny for Python-app om 2v2-manillen-tafels te organiseren voor een familie-
 
 ## Projectstatus
 
-Deze repository is de actuele, werkende basis voor de volledige NAS-applicatie en de publieke read-only mirror. De hoofdapplicatie is de schrijfbare Shiny-app in `app.py`; de mirror in `mirror_app/` is een snapshot-export voor GitHub Pages. De meest recente workflow is: data wordt lokaal ingevoerd, de app bewaart en berekent de stand, en de public mirror kan handmatig via GitHub Actions worden geüpdatet.
+Deze repository is de actuele, werkende basis voor de volledige NAS-applicatie en de read-only GitHub Pages-app. De hoofdapplicatie is de schrijfbare Shiny-app in `app.py`; de app in `mirror_app/` is een momentopname voor GitHub Pages. De meest recente workflow is: data wordt lokaal ingevoerd, de app bewaart en berekent de stand, en de GitHub Pages-weergave kan handmatig via GitHub Actions worden bijgewerkt.
 
 ## LLM-context en wijzigingsbasis
 
@@ -35,7 +35,7 @@ Kortom: als een wijziging "groot" is, dan is een README-update verplicht. Als ee
 - Reservenamen per speeldag opslaan en automatisch opnieuw laden; reserves krijgen een afwijkende Excel-stijl.
 - Scores voor de drie 2v2-spellen per tafel invoeren.
 - Een tussenstand bekijken voor alle speeldagen of één specifieke speeldag.
-- Een publieke, read-only Shinylive-mirror publiceren naar GitHub Pages.
+- Een alleen-lezen Shinylive-app publiceren naar GitHub Pages.
 
 ## Projectstructuur
 
@@ -65,8 +65,8 @@ Kortom: als een wijziging "groot" is, dan is een README-update verplicht. Als ee
 │   ├── data/                 # Publieke snapshot van de CSV-data.
 │   ├── data_helpers.py       # Pure geschiedenis- en paringreaders.
 │   ├── score_helpers.py      # Pure score- en klassementberekening.
-│   ├── requirements.txt      # Shinylive-compatibele mirror-dependency.
-│   └── README.md             # Korte mirrorhandleiding.
+│   ├── requirements.txt      # Shinylive-compatibele dependency.
+│   └── README.md             # Korte handleiding voor de GitHub Pages-app.
 ├── legacy/
 │   ├── ManillenGUI.py        # Oude Tkinter/ipywidgets-interface.
 │   └── Manillen.ipynb        # Oude notebook-workflow.
@@ -113,11 +113,11 @@ Maak in Portainer een Stack from Git repository met deze repository. De stack ge
 
 Beperk de toegang tot het lokale netwerk of gebruik Tailscale om de NAS-app privé te bereiken. De app gebruikt absolute paden vanuit de projectcode en blijft daardoor onafhankelijk van de working directory. Na een nieuwe GitHub-versie kies je in Portainer **Pull and redeploy** of voer je een stack-update/redeploy uit, zodat de image opnieuw wordt gebouwd; `/app/data` blijft behouden.
 
-De volledige NAS-app en de publieke mirror zijn aparte deployments. De Docker-container voert alleen `app.py` uit en draait `mirror_app/` niet als viewer.
+De volledige NAS-app en de read-only GitHub Pages-app zijn aparte deployments. De Docker-container voert alleen `app.py` uit en draait `mirror_app/` niet als viewer.
 
-### NAS -> publieke mirror publiceren
+### NAS -> GitHub Pages publiceren
 
-In de NAS-app staat in het tabblad Geschiedenis de knop **Publiceer data**. Deze knop start alleen de GitHub Actions-workflow via GitHub’s `workflow_dispatch` API. De workflow voert daarna zelf `publish_mirror.py` uit, commit de nieuwe snapshot en werkt GitHub Pages bij. Een succesmelding betekent dus alleen dat de workflow is gestart; GitHub Pages kan daarna nog enige tijd nodig hebben.
+In de NAS-app staat in het tabblad Geschiedenis de knop **Publiceer data**. Deze knop start de GitHub Actions-workflow via GitHub’s `workflow_dispatch` API. De workflow voert daarna zelf `publish_mirror.py` uit, commit de nieuwe momentopname en werkt GitHub Pages bij. Een succesmelding betekent dus alleen dat de workflow is gestart; GitHub Pages kan daarna nog enige tijd nodig hebben.
 
 De publieke projectsite staat op `https://nubrodr.github.io/Manillen/`. De URL `https://nubrodr.github.io/` is alleen de gebruikerssite van GitHub en verwijst niet automatisch naar deze repository.
 
@@ -134,9 +134,9 @@ De meegeleverde workflow staat in `.github/workflows/publish-mirror.yml` en kan 
 NAS-knop -> GitHub API -> workflow_dispatch -> publish_mirror.py -> GitHub commit -> GitHub Pages
 ```
 
-## Publieke read-only mirror
+## Read-only GitHub Pages-app
 
-`mirror_app/` toont alleen Geschiedenis, Tussenstand en Parenhistoriek. Er zijn geen formulieren, score-invoer, indelingsknoppen of verwijderacties. De CSV’s in `mirror_app/data/` zijn een snapshot en worden niet live van de NAS gelezen. Op mobiel staat de navigatie sticky bovenaan met een hamburgerknop; de drie tabs klappen verticaal uit.
+`mirror_app/` toont alleen Geschiedenis, Tussenstand en Parenhistoriek. Er zijn geen formulieren, score-invoer, indelingsknoppen of verwijderacties. De CSV’s in `mirror_app/data/` zijn een momentopname en worden niet live van de NAS gelezen. Op mobiel staat de navigatie sticky bovenaan met een hamburgerknop; de drie tabs klappen verticaal uit.
 
 Werk de snapshot en GitHub Pages-export bij vanuit de repository-root:
 
@@ -144,11 +144,11 @@ Werk de snapshot en GitHub Pages-export bij vanuit de repository-root:
 pip install -r mirror_app/requirements.txt
 python publish_mirror.py
 git add .
-git commit -m "Update publieke mirror"
+git commit -m "Update Manillen Pages-app"
 git push
 ```
 
-Het script kopieert `data/pairings.csv`, `data/pairings_history.csv`, `data/scores_history.csv` en `data/reserve_assignments.csv` indien aanwezig naar `mirror_app/data/`, en voert `shinylive export mirror_app docs` uit. De mirror gebruikt de reserve-snapshot om ingevulde reservenamen in de geschiedenis te tonen. Git-commando’s blijven bewust handmatig.
+Het script kopieert `data/pairings.csv`, `data/pairings_history.csv`, `data/scores_history.csv` en `data/reserve_assignments.csv` indien aanwezig naar `mirror_app/data/`, en voert `shinylive export mirror_app docs` uit. De snapshot met reservekoppelingen zorgt dat ingevulde reservenamen in Geschiedenis zichtbaar blijven. Git-commando’s blijven bewust handmatig.
 
 GitHub Pages wordt gedeployed door `.github/workflows/deploy-pages.yml`. Na een push naar `main` is de publieke projectsite beschikbaar op `https://nubrodr.github.io/Manillen/`.
 

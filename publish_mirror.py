@@ -17,11 +17,11 @@ SNAPSHOT_FILES = (
 )
 SOURCE_DATA = ROOT / "data"
 STYLE_SOURCE = ROOT / "www" / "manillen.css"
-PAGE_TITLE = "Manillen | Publieke mirror"
+PAGE_TITLE = "Manillen | Speeldagen"
 FAVICON_NAME = "favicon.ico"
 FAVICON_SOURCE = ROOT / "www" / FAVICON_NAME
-PAGE_TITLE = "Manillen | Publieke mirror"
-PAGE_DESCRIPTION = "Publieke mirror van de Manillen-app."
+PAGE_TITLE = "Manillen | Speeldagen"
+PAGE_DESCRIPTION = "Alleen-lezen overzicht van Manillen-speeldagen, tussenstand en parenhistoriek."
 PAGE_URL = "https://nubrodr.github.io/Manillen/"
 PAGE_IMAGE = "https://nubrodr.github.io/Manillen/images/android-chrome-512x512.png"
 
@@ -109,7 +109,7 @@ def main():
         (OUTPUT / FAVICON_NAME).write_bytes(favicon_data)
     _embed_css_in_export()
     _set_page_title()
-    print("Mirror gepubliceerd als Shinylive-export.")
+    print("GitHub Pages-export aangemaakt.")
     print(f"Snapshots gekopieerd naar: {DATA}")
     print(f"Bestanden: {', '.join(copied) if copied else 'geen (bronbestanden ontbreken)'}")
     print(f"Export geschreven naar: {OUTPUT}")

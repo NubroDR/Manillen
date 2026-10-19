@@ -234,12 +234,12 @@ history_choices = {item: item for item in _history_dates()}
 app_ui = ui.page_fluid(
     ui.tags.head(
         ui.tags.meta(name="viewport", content="width=device-width, initial-scale=1"),
-        ui.tags.title("Manillen | Publieke mirror"),
+        ui.tags.title("Manillen | Speeldagen"),
         ui.tags.style(APP_CSS),
     ),
     ui.div(
         ui.div(
-            ui.div("Manillen | Publieke mirror", class_="mobile-nav-brand"),
+            ui.div("Manillen | Speeldagen", class_="mobile-nav-brand"),
             ui.tags.button(
                 ui.tags.span(class_="hamburger-icon", aria_hidden="true"),
                 id="mobile-nav-toggle",
@@ -343,10 +343,10 @@ app_ui = ui.page_fluid(
         class_="mirror-navigation-group",
     ),
     ui.div(
-        ui.div("MANILLEN / PUBLIEKE MIRROR", class_="eyebrow"),
-        ui.h1("Manillen before dark: de speeldagen, helder bijgehouden."),
+        ui.div("MANILLEN / OVERZICHT", class_="eyebrow"),
+        ui.h1("Speeldagen, tussenstand en parenhistoriek."),
         ui.p(
-            "Een actuele, alleen-lezen momentopname van speeldagen, tussenstand en parenhistoriek."
+            "Een actuele, alleen-lezen weergave van speeldagen, tussenstand en parenhistoriek."
         ),
         class_="intro",
     ),
