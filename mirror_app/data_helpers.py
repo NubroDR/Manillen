@@ -5,22 +5,51 @@ from collections import defaultdict
 from pathlib import Path
 
 
-def load_pairing_history(history_filename):
-    """Return history grouped by date as ``{date: [(table, players), ...]}``."""
-    grouped = defaultdict(list)
+DEFAULT_SEASON = "2026-2027"
+
+
+def load_pairing_records(history_filename):
+    """Return valid history rows with their date, table, players, and season."""
     path = Path(history_filename)
     if not path.exists():
-        return {}
+        return []
+    records = []
     with path.open("r", encoding="utf-8", newline="") as file:
         for row in csv.DictReader(file):
+            play_date = row.get("Date", "").strip()
             players = [name.strip() for name in row.get("Players", "").split("|")]
-            if len(players) != 4 or not row.get("Date"):
-                continue
             try:
                 table = int(row.get("Table", ""))
             except (TypeError, ValueError):
                 continue
-            grouped[row["Date"].strip()].append((table, players))
+            if not play_date or len(players) != 4:
+                continue
+            records.append({
+                "Date": play_date,
+                "Table": table,
+                "Players": players,
+                "Season": (row.get("Season") or "").strip() or DEFAULT_SEASON,
+            })
+    return records
+
+
+def load_all_players(players_filename):
+    path = Path(players_filename)
+    if not path.exists():
+        return []
+    with path.open("r", encoding="utf-8", newline="") as file:
+        return [
+            row[0].strip()
+            for row in csv.reader(file)
+            if row and row[0].strip()
+        ]
+
+
+def load_pairing_history(history_filename):
+    """Return history grouped by date as ``{date: [(table, players), ...]}``."""
+    grouped = defaultdict(list)
+    for row in load_pairing_records(history_filename):
+        grouped[row["Date"]].append((row["Table"], row["Players"]))
     return {
         play_date: sorted(tables, key=lambda item: item[0])
         for play_date, tables in grouped.items()

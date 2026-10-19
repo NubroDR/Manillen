@@ -9,8 +9,9 @@ from pathlib import Path
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 
+from data_paths import DATA_DIR
+from mirror_app.season_helpers import DEFAULT_SEASON, migrate_pairing_history
 
-DATA_DIR = Path(__file__).resolve().parent / 'data'
 RESERVE_FILL = PatternFill(fill_type='solid', fgColor='FFF0CF')
 RESERVE_TEXT_COLOR = '806B1D'
 
@@ -70,26 +71,39 @@ def load_pair_counts(csv_filename=str(DATA_DIR / 'pairings.csv')):
     return pair_counts
 
 
-def save_pairings_history(config, play_date=None, history_filename=str(DATA_DIR / 'pairings_history.csv')):
+def save_pairings_history(
+    config,
+    play_date=None,
+    history_filename=str(DATA_DIR / 'pairings_history.csv'),
+    season=DEFAULT_SEASON,
+):
     """Save a table pairing configuration to a history CSV file."""
     if play_date is None:
         play_date = date.today().isoformat()
     elif isinstance(play_date, date):
         play_date = play_date.isoformat()
 
-    file_exists = False
-    try:
-        with open(history_filename, 'r', encoding='utf-8') as _:
-            file_exists = True
-    except FileNotFoundError:
-        pass
+    history_path = Path(history_filename)
+    if history_path.exists():
+        migrate_pairing_history(history_path)
+    file_exists = history_path.exists()
 
-    with open(history_filename, 'a', encoding='utf-8', newline='') as f:
+    fieldnames = ['Date', 'Table', 'Players', 'Season']
+    if file_exists:
+        with history_path.open('r', encoding='utf-8', newline='') as existing:
+            fieldnames = list(csv.DictReader(existing).fieldnames or fieldnames)
+    with history_path.open('a', encoding='utf-8', newline='') as f:
         writer = csv.writer(f)
         if not file_exists:
-            writer.writerow(['Date', 'Table', 'Players'])
+            writer.writerow(fieldnames)
         for table_number, group in enumerate(config, start=1):
-            writer.writerow([play_date, table_number, ' | '.join(group)])
+            values = {
+                'Date': play_date,
+                'Table': table_number,
+                'Players': ' | '.join(group),
+                'Season': season,
+            }
+            writer.writerow([values.get(field, '') for field in fieldnames])
 
     print(f"Saved pairing history to {history_filename} for date {play_date}")
 
@@ -470,7 +484,13 @@ def make_groups_simple_greedy(pool, group_size, csv_filename):
     return [(max_pair_count, sorted_config)]
 
 
-def update_pairs_in_csv(config, csv_filename, history_filename=None, play_date=None):
+def update_pairs_in_csv(
+    config,
+    csv_filename,
+    history_filename=None,
+    play_date=None,
+    season=DEFAULT_SEASON,
+):
     """
     Update CSV with pairs from the chosen configuration.
     Each group of 4 players generates 6 pairs.
@@ -500,7 +520,12 @@ def update_pairs_in_csv(config, csv_filename, history_filename=None, play_date=N
             writer.writerow([p1, p2, count])
 
     if history_filename:
-        save_pairings_history(config, play_date=play_date, history_filename=history_filename)
+        save_pairings_history(
+            config,
+            play_date=play_date,
+            history_filename=history_filename,
+            season=season,
+        )
 
     print(f"Updated {csv_filename} with {pairs_added} pairs (Reserve pairs excluded)")
 

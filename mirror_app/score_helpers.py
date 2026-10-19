@@ -5,6 +5,10 @@ from collections import defaultdict
 from datetime import date
 from pathlib import Path
 
+try:
+    from .data_helpers import load_pairing_records, load_reserve_assignments
+except ImportError:
+    from data_helpers import load_pairing_records, load_reserve_assignments
 
 DEFAULT_SCORES_FILE = Path(__file__).resolve().parent / "data" / "scores_history.csv"
 
@@ -45,13 +49,48 @@ def load_scores(scores_filename=str(DEFAULT_SCORES_FILE), play_date=None):
     return rows
 
 
-def compute_standings(scores_filename=str(DEFAULT_SCORES_FILE), play_date=None):
+def compute_standings(
+    scores_filename=str(DEFAULT_SCORES_FILE),
+    play_date=None,
+    season=None,
+    history_filename=None,
+    reserve_assignments_filename=None,
+):
+    selected_date = _score_date(play_date) if play_date is not None else None
+    scores = load_scores(scores_filename, selected_date)
+    if season is not None:
+        if history_filename is None:
+            raise ValueError("history_filename is required when filtering by season")
+        season_dates = {
+            row["Date"]
+            for row in load_pairing_records(history_filename)
+            if row["Season"] == season
+        }
+        scores = [row for row in scores if row["Date"] in season_dates]
+
+    assignments = {}
+    if reserve_assignments_filename is not None:
+        assignments = load_reserve_assignments(reserve_assignments_filename)
+
     standings = defaultdict(lambda: {"games_played": 0, "wins": 0, "points_for": 0, "points_against": 0})
-    for row in load_scores(scores_filename, play_date):
+    for row in scores:
         team1 = [name.strip() for name in row["Team1Players"].split("|") if name.strip()]
         team2 = [name.strip() for name in row["Team2Players"].split("|") if name.strip()]
         if len(team1) != 2 or len(team2) != 2:
             continue
+        reserve_names = assignments.get(row["Date"], {})
+        team1 = [
+            f"{reserve_names.get(name, name)}*"
+            if name.casefold().startswith("reserve ")
+            else name
+            for name in team1
+        ]
+        team2 = [
+            f"{reserve_names.get(name, name)}*"
+            if name.casefold().startswith("reserve ")
+            else name
+            for name in team2
+        ]
         scores = (row["Team1Score"], row["Team2Score"])
         for team_index, team in enumerate((team1, team2)):
             points_for, points_against = scores[team_index], scores[1 - team_index]

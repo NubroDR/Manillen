@@ -123,6 +123,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, .nav-link:focus
 .data-table .score-loser { color: var(--muted); font-weight: 400; }
 .table-scroll { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .data-table { min-width: 520px; }
+.reserve-footnote { margin: var(--space-2) 0 0; color: var(--muted); font-size: .9rem; }
 
 .score-table-card { padding: var(--space-4) 0; border-top: 1px solid var(--line); }
 .score-table-card h3 { margin-bottom: var(--space-2); }

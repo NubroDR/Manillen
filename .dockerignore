@@ -6,6 +6,9 @@ env
 __pycache__
 *.py[cod]
 .pytest_cache
+tests/
+requirements-dev.txt
+data/hall_of_fame_check.csv
 .mypy_cache
 .ruff_cache
 .ipynb_checkpoints

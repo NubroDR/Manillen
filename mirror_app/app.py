@@ -6,18 +6,36 @@ from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 
 try:
     from .data_helpers import (
+        load_all_players,
         load_pairing_counts,
         load_pairing_history,
+        load_pairing_records,
         load_reserve_assignments,
     )
     from .score_helpers import compute_standings, load_scores
+    from .season_helpers import (
+        MIN_GAMES_FOR_AWARD,
+        compute_hall_of_fame,
+        compute_closed_season_awards,
+        load_legacy_seasons,
+        load_seasons,
+    )
 except ImportError:
     from data_helpers import (
+        load_all_players,
         load_pairing_counts,
         load_pairing_history,
+        load_pairing_records,
         load_reserve_assignments,
     )
     from score_helpers import compute_standings, load_scores
+    from season_helpers import (
+        MIN_GAMES_FOR_AWARD,
+        compute_hall_of_fame,
+        compute_closed_season_awards,
+        load_legacy_seasons,
+        load_seasons,
+    )
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -26,6 +44,10 @@ HISTORY_FILE = DATA_DIR / "pairings_history.csv"
 PAIRINGS_FILE = DATA_DIR / "pairings.csv"
 SCORES_FILE = DATA_DIR / "scores_history.csv"
 RESERVE_ASSIGNMENTS_FILE = DATA_DIR / "reserve_assignments.csv"
+PLAYERS_FILE = DATA_DIR / "AllPlayers.csv"
+SEASONS_FILE = DATA_DIR / "seasons.csv"
+LEGACY_SEASONS_FILE = DATA_DIR / "seasons_history.csv"
+LEGACY_PLAYDAYS_FILE = DATA_DIR / "seasons_playdays_legacy.csv"
 STYLE_FILE = BASE_DIR / "manillen.css"
 if not STYLE_FILE.exists():
     STYLE_FILE = BASE_DIR.parent / "www" / "manillen.css"
@@ -40,8 +62,17 @@ def _scores_input_id(play_date):
     return f"mirror_scores_{play_date.replace('-', '_')}"
 
 
-def _history_view():
-    history = load_pairing_history(HISTORY_FILE)
+def _history_view(season=None):
+    selected_dates = {
+        row["Date"]
+        for row in load_pairing_records(HISTORY_FILE)
+        if season is None or row["Season"] == season
+    }
+    history = {
+        play_date: rows
+        for play_date, rows in load_pairing_history(HISTORY_FILE).items()
+        if play_date in selected_dates
+    }
     if not history:
         return ui.div("Nog geen speeldagen gevonden.", class_="empty-state")
     today = date.today().isoformat()
@@ -102,6 +133,25 @@ def _history_view():
 
 def _scores_view(play_date=None, selected_player=""):
     rows = load_scores(str(SCORES_FILE), play_date or None)
+    reserve_names = load_reserve_assignments(RESERVE_ASSIGNMENTS_FILE)
+    rows = [
+        {
+            **row,
+            "Team1Players": " | ".join(
+                f"{reserve_names.get(row['Date'], {}).get(name.strip(), name.strip())}*"
+                if name.strip().casefold().startswith("reserve ")
+                else name.strip()
+                for name in row["Team1Players"].split("|")
+            ),
+            "Team2Players": " | ".join(
+                f"{reserve_names.get(row['Date'], {}).get(name.strip(), name.strip())}*"
+                if name.strip().casefold().startswith("reserve ")
+                else name.strip()
+                for name in row["Team2Players"].split("|")
+            ),
+        }
+        for row in rows
+    ]
     if selected_player:
         rows = [
             row for row in rows
@@ -131,8 +181,14 @@ def _scores_view(play_date=None, selected_player=""):
         ui.tags.tbody(*table_rows), class_="data-table"
     ), class_="table-scroll")
 
-def _standings_view(play_date=None):
-    rows = compute_standings(str(SCORES_FILE), play_date or None)
+def _standings_view(play_date=None, season=None):
+    rows = compute_standings(
+        str(SCORES_FILE),
+        play_date or None,
+        season=season,
+        history_filename=str(HISTORY_FILE),
+        reserve_assignments_filename=str(RESERVE_ASSIGNMENTS_FILE),
+    )
     if not rows:
         return ui.div("Nog geen scores gevonden.", class_="empty-state")
 
@@ -169,7 +225,8 @@ def _standings_view(play_date=None):
         )
 
     return ui.div(
-        ui.tags.table(
+        ui.div(
+            ui.tags.table(
             ui.tags.thead(
                 ui.tags.tr(
                     ui.tags.th("#"),
@@ -183,8 +240,10 @@ def _standings_view(play_date=None):
             ),
             ui.tags.tbody(*table_rows),
             class_="data-table",
+            ),
+            class_="table-scroll",
         ),
-        class_="table-scroll",
+        ui.p("* = reservespeler.", class_="reserve-footnote"),
     )
 
 
@@ -225,10 +284,124 @@ def _pairings_view(selected_player=""):
     )
 
 
+def _closed_tool_awards():
+    return compute_closed_season_awards(
+        SEASONS_FILE,
+        SCORES_FILE,
+        HISTORY_FILE,
+        pool_players,
+        MIN_GAMES_FOR_AWARD,
+    )
+
+
+def _seasons_view():
+    legacy = load_legacy_seasons(LEGACY_SEASONS_FILE, LEGACY_PLAYDAYS_FILE)
+    rows = [
+        (
+            f"S{row['SeasonNumber']}",
+            row["Season"],
+            str(row["Pool"]),
+            row["Gold"],
+            row["Silver"],
+            row["Bronze"],
+            row["RedLantern"],
+            row["Playdays"],
+        )
+        for row in legacy
+    ]
+    awards_by_season = dict(_closed_tool_awards())
+    for season in load_seasons(SEASONS_FILE):
+        awards = awards_by_season.get(season["Season"], {})
+        rows.append((
+            f"S{season['SeasonNumber']}",
+            season["Season"],
+            str(len(pool_players)),
+            awards.get("Gold", ""),
+            awards.get("Silver", ""),
+            awards.get("Bronze", ""),
+            awards.get("RedLantern", ""),
+            [],
+        ))
+    if not rows:
+        return ui.div("Nog geen seizoenen gevonden.", class_="empty-state")
+    table_rows = []
+    for number, label, pool_size, gold, silver, bronze, lantern, playdays in rows:
+        playday_items = [
+            ui.div(
+                html.escape(
+                    f"{item.get('Date', '')} · {item.get('Location', '')} "
+                    f"({item.get('Players', '')}/{item.get('Pool', '')})"
+                )
+            )
+            for item in playdays
+        ]
+        table_rows.append(ui.tags.tr(
+            ui.tags.td(html.escape(number)),
+            ui.tags.td(html.escape(label)),
+            ui.tags.td(html.escape(pool_size)),
+            ui.tags.td(html.escape(gold)),
+            ui.tags.td(html.escape(silver)),
+            ui.tags.td(html.escape(bronze)),
+            ui.tags.td(html.escape(lantern)),
+            ui.tags.td(*(playday_items or ["—"])),
+        ))
+    return ui.div(
+        ui.tags.table(
+            ui.tags.thead(ui.tags.tr(
+                ui.tags.th("Seizoen"), ui.tags.th("Label"), ui.tags.th("Pool"),
+                ui.tags.th("Beker"), ui.tags.th("Zilver"), ui.tags.th("Brons"),
+                ui.tags.th("Rode lantaarn"), ui.tags.th("Speeldagen"),
+            )),
+            ui.tags.tbody(*table_rows),
+            class_="data-table",
+        ),
+        class_="table-scroll",
+    )
+
+
+def _hall_of_fame_view():
+    rows = compute_hall_of_fame(
+        pool_players,
+        LEGACY_SEASONS_FILE,
+        _closed_tool_awards(),
+    )
+    if not rows:
+        return ui.div("Nog geen Hall of Fame-resultaten.", class_="empty-state")
+    return ui.div(
+        ui.tags.table(
+            ui.tags.thead(ui.tags.tr(
+                ui.tags.th("Speler"), ui.tags.th("Goud"), ui.tags.th("Zilver"),
+                ui.tags.th("Brons"), ui.tags.th("Rode lantaarn"),
+            )),
+            ui.tags.tbody(*[
+                ui.tags.tr(
+                    ui.tags.td(html.escape(row["Player"])),
+                    ui.tags.td(str(row["Gold"]), class_="numeric"),
+                    ui.tags.td(str(row["Silver"]), class_="numeric"),
+                    ui.tags.td(str(row["Bronze"]), class_="numeric"),
+                    ui.tags.td(str(row["RedLantern"]), class_="numeric"),
+                )
+                for row in rows
+            ]),
+            class_="data-table",
+        ),
+        class_="table-scroll",
+    )
+
+
+pool_players = sorted(load_all_players(PLAYERS_FILE), key=str.casefold)
 players = sorted(
-    {player for rows in load_pairing_counts(PAIRINGS_FILE) for player in rows[:2]},
+    set(pool_players)
+    | {player for rows in load_pairing_counts(PAIRINGS_FILE) for player in rows[:2]},
     key=str.casefold,
 )
+seasons = load_seasons(SEASONS_FILE)
+active_seasons = [row for row in seasons if row["Status"] == "actief"]
+active_season = active_seasons[0]["Season"] if len(active_seasons) == 1 else "2026-2027"
+season_choices = {
+    row["Season"]: f"S{row['SeasonNumber']} · {row['Season']}"
+    for row in seasons
+}
 history_choices = {item: item for item in _history_dates()}
 
 app_ui = ui.page_fluid(
@@ -256,9 +429,15 @@ app_ui = ui.page_fluid(
                 ui.div(
                     ui.h2("Tussenstand"),
                     ui.input_select(
+                        "standings_season",
+                        "Seizoen",
+                        {"": "Alle seizoenen", **season_choices},
+                        selected=active_season,
+                    ),
+                    ui.input_select(
                         "standings_date",
-                        "Periode",
-                        {"": "Alle speeldagen (cumulatief)", **history_choices},
+                        "Speeldag",
+                        {"": "Alle speeldagen", **history_choices},
                     ),
                     ui.output_ui("standings"),
                     class_="panel",
@@ -266,7 +445,17 @@ app_ui = ui.page_fluid(
             ),
             ui.nav_panel(
                 "Speeldagen",
-                ui.div(ui.h2("Speeldagen"), ui.output_ui("history"), class_="panel"),
+                ui.div(
+                    ui.h2("Speeldagen"),
+                    ui.input_select(
+                        "history_season",
+                        "Seizoen",
+                        {"": "Alle seizoenen", **season_choices},
+                        selected=active_season,
+                    ),
+                    ui.output_ui("history"),
+                    class_="panel",
+                ),
             ),
             ui.nav_panel(
                 "Scores",
@@ -315,6 +504,22 @@ app_ui = ui.page_fluid(
                     class_="panel",
                 ),
             ),
+            ui.nav_panel(
+                "Seizoenen",
+                ui.div(
+                    ui.h2("Seizoenen"),
+                    ui.output_ui("seasons"),
+                    class_="panel",
+                ),
+            ),
+            ui.nav_panel(
+                "Hall of Fame",
+                ui.div(
+                    ui.h2("Hall of Fame"),
+                    ui.output_ui("hall_of_fame"),
+                    class_="panel",
+                ),
+            ),
             id="tabs",
             selected="Tussenstand",
         ),
@@ -360,12 +565,42 @@ def server(input: Inputs, output: Outputs, session: Session):
     @render.ui
     def history():
         refresh()
-        return _history_view()
+        return _history_view(input.history_season() or None)
 
     @render.ui
     def standings():
         refresh()
-        return _standings_view(input.standings_date() or None)
+        return _standings_view(
+            input.standings_date() or None,
+            input.standings_season() or None,
+        )
+
+    @render.ui
+    def seasons():
+        refresh()
+        return _seasons_view()
+
+    @render.ui
+    def hall_of_fame():
+        refresh()
+        return _hall_of_fame_view()
+
+    @reactive.effect
+    def update_standings_dates():
+        selected_season = input.standings_season() or None
+        dates = sorted(
+            {
+                row["Date"]
+                for row in load_pairing_records(HISTORY_FILE)
+                if selected_season is None or row["Season"] == selected_season
+            },
+            reverse=True,
+        )
+        ui.update_select(
+            "standings_date",
+            choices={"": "Alle speeldagen", **{item: item for item in dates}},
+            selected="",
+        )
 
     @render.ui
     def scores():

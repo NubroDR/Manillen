@@ -34,7 +34,9 @@ Kortom: als een wijziging "groot" is, dan is een README-update verplicht. Als ee
 - Excel-scorebladen genereren vanuit een opgeslagen speeldag, met alleen het benodigde aantal reservevelden.
 - Reservenamen per speeldag opslaan en automatisch opnieuw laden; reserves krijgen een afwijkende Excel-stijl.
 - Scores voor de drie 2v2-spellen per tafel invoeren.
-- Een tussenstand bekijken voor alle speeldagen of één specifieke speeldag.
+- Scores per spel opslaan, ook als de rest van de speeldag nog niet is ingevuld.
+- Een tussenstand en speeldaggeschiedenis bekijken met een seizoensfilter.
+- Historische seizoenen en de Hall of Fame bekijken.
 - Een alleen-lezen Shinylive-app publiceren naar GitHub Pages.
 
 ## Projectstructuur
@@ -42,11 +44,13 @@ Kortom: als een wijziging "groot" is, dan is een README-update verplicht. Als ee
 ```text
 .
 ├── app.py                    # Volledige schrijfbare NAS-app.
+├── data_paths.py             # Data-directory, configureerbaar via MANILLEN_DATA_DIR.
 ├── manillen_functions.py     # Indeling, paringen en scorebladlogica.
 ├── score_functions.py        # Schrijfbare scoreworkflow met gedeelde scoreberekening.
 ├── reserve_assignments.py    # Datumgebonden CRUD voor ingevulde reservenamen.
 ├── github_publish.py         # Veilige GitHub Actions workflow-dispatch.
 ├── requirements.txt          # Dependencies voor de volledige app.
+├── requirements-dev.txt      # pytest en de runtime-dependencies voor tests.
 ├── Dockerfile                # Image voor de volledige NAS-app.
 ├── docker-compose.yml        # Portainer Stack-configuratie.
 ├── docker-entrypoint.sh      # Seedt een leeg /app/data-volume.
@@ -64,9 +68,11 @@ Kortom: als een wijziging "groot" is, dan is een README-update verplicht. Als ee
 │   ├── app.py                # Alleen-lezen Shiny-app voor publicatie.
 │   ├── data/                 # Publieke snapshot van de CSV-data.
 │   ├── data_helpers.py       # Pure geschiedenis- en paringreaders.
+│   ├── season_helpers.py     # Seizoensmigratie, awards en Hall of Fame-berekening.
 │   ├── score_helpers.py      # Pure score- en klassementberekening.
 │   ├── requirements.txt      # Shinylive-compatibele dependency.
 │   └── README.md             # Korte handleiding voor de GitHub Pages-app.
+├── tests/                    # Geïsoleerde pytest-suite en tijdelijke fixtures.
 ├── legacy/
 │   ├── ManillenGUI.py        # Oude Tkinter/ipywidgets-interface.
 │   └── Manillen.ipynb        # Oude notebook-workflow.
@@ -88,11 +94,36 @@ shiny run app.py
 
 Open daarna de URL die Shiny toont, normaal `http://127.0.0.1:8000`.
 
+Voor geïsoleerde lokale tests wordt `MANILLEN_DATA_DIR` gebruikt. Zonder deze variabele blijft de projectmap `data/` de standaard. Installeer de testafhankelijkheden en voer pytest uit:
+
+```powershell
+pip install -r requirements-dev.txt
+pytest
+```
+
+De tests zetten `MANILLEN_DATA_DIR` naar een tijdelijke map. `tests/`, `requirements-dev.txt` en `data/hall_of_fame_check.csv` worden niet in het Docker-image opgenomen.
+
 ## Tafelindeling en scores
 
 De indeling gebruikt een greedy-algoritme. Het algoritme probeert meerdere startvolgordes, vormt telkens de best mogelijke groep van vier en minimaliseert eerst de meest herhaalde paring in de configuratie. Daarna gebruikt het het aantal herhaalde paringen en de totale paringtelling als tie-breakers. Reservespelers worden toegevoegd wanneer het aantal aanwezigen geen veelvoud van vier is; twee reservespelers komen niet samen aan één tafel.
 
-Elke tafel speelt drie unieke 2v2-combinaties. Een spel loopt tot en met 101 punten. In de tussenstand worden spelers eerst gesorteerd op gewonnen spellen, daarna op aantal gespeelde spellen en vervolgens op puntensaldo. Het puntensaldo is punten voor min punten tegen.
+Elke tafel speelt drie unieke 2v2-combinaties. Een spel loopt tot en met 101 punten. In **Scores invoeren** wordt elk spel afzonderlijk opgeslagen; ontbrekende scores voor andere spellen blokkeren dat niet. Opslaan vervangt hetzelfde spel op basis van datum, tafel en spelnummer, zodat herhaald opslaan geen dubbele rij maakt. Een volledig spel vereist twee niet-negatieve gehele scores.
+
+In de tussenstand worden spelers eerst gesorteerd op gewonnen spellen, daarna op aantal gespeelde spellen, vervolgens op puntensaldo en ten slotte op naam. Het puntensaldo is punten voor min punten tegen. De reservekolommen in opgeslagen scores blijven herkenbaar als reserve; de tussenstand toont de per speeldag opgeslagen reservenaam met `*` en vermeldt `* = reservespeler`. Een ingevoerde reservenaam die gelijk is aan een poolspeler geeft een waarschuwing.
+
+## Seizoenen en prijzen
+
+`data/seasons.csv` is het register van tool-seizoenen met uitsluitend `Season`, `SeasonNumber`, `SeasonStartYear` en `Status`. Een nieuwe speeldag krijgt standaard het actieve seizoen, maar het seizoen is vóór het bewaren te kiezen. `pairings_history.csv` bewaart het expliciete `Season` per tafelrij; een oude CSV zonder die kolom wordt als `2026-2027` gelezen.
+
+Bij de eerste migratie wordt vóór wijziging van `pairings_history.csv` verplicht één backup gemaakt als `pairings_history.csv.bak-pre-seasons`; een bestaande backup wordt nooit overschreven. De migratie schrijft eerst naar een tijdelijk bestand en vervangt het origineel alleen na een geslaagde write. De startup kopieert ontbrekende seedbestanden naar `/app/data`, maar vervangt geen bestaande bestanden.
+
+**Maak vóór de eerste redeploy handmatig een volledige kopie van `/volume1/manillen_data` naar een veilige backup-locatie.** De automatische historybackup is aanvullend en vervangt deze NAS-backup niet.
+
+`Tussenstand` en `Speeldagen` starten met een filter op het actieve seizoen en kunnen naar eerdere seizoenen worden geschakeld. Tussenstand behoudt ook de keuze voor één specifieke speeldag. `Nieuw seizoen` toont eerst de eindstand ter controle; na bevestiging sluit het huidige seizoen en maakt het volgende actief. Een afgesloten seizoen kan worden heropend zolang er geen later seizoen actief is.
+
+Tool-seizoenen kennen prijzen alleen toe als ze zijn afgesloten. De berekening gebruikt de getoonde rangschikking en spelers uit `AllPlayers.csv`; minimaal drie gespeelde spellen zijn vereist. Reserves zijn uitgesloten van prijzen en Hall of Fame. Bij minder dan vier eligible spelers kan volgens de gekozen regel een speler zowel een medaille als de rode lantaarn krijgen. De prijzen worden steeds uit scores berekend en niet apart opgeslagen.
+
+De tabbladen **Seizoenen** en **Hall of Fame** bevatten de historische seizoenen uit `seasons_history.csv` en, voor 2023–2024 en 2024–2025, de speeldagen uit `seasons_playdays_legacy.csv`. Ties tellen voor iedere betrokken speler. De Hall of Fame toont alle huidige poolspelers, ook met nul prijzen, plus voormalige spelers met historische prijzen. `hall_of_fame_check.csv` wordt uitsluitend als testfixture gebruikt en nooit door de entrypoint, `publish_mirror.py` of `github_publish.py` gekopieerd.
 
 ## NAS-hosting
 
@@ -107,7 +138,7 @@ docker run --rm -p 8080:8000 -v manillen_data:/app/data manillen:latest
 
 Open de app lokaal of via Tailscale op `http://<nas-hostnaam>:8080`.
 
-De lokale `docker run`-voorbeeldopdracht gebruikt een Docker-volume met de naam `manillen_data`. De NAS-configuratie in `docker-compose.yml` gebruikt daarentegen een bind mount van `/volume1/manillen_data` naar `/app/data`; zorg dat deze map op de NAS bestaat en schrijfbaar is. Bij een eerste start kopieert de entrypoint alleen ontbrekende basisbestanden naar `/app/data`, waaronder `Scorebladen.xlsx`. Bestaande CSV’s en scorebladen worden nooit overschreven. Gegenereerde scorebladen blijven samen met de datastore in de gemounte map staan.
+De lokale `docker run`-voorbeeldopdracht gebruikt een Docker-volume met de naam `manillen_data`. De NAS-configuratie in `docker-compose.yml` gebruikt daarentegen een bind mount van `/volume1/manillen_data` naar `/app/data`; zorg dat deze map op de NAS bestaat en schrijfbaar is. Bij een eerste start kopieert de entrypoint alleen ontbrekende basisbestanden naar `/app/data`, waaronder `Scorebladen.xlsx` en de twee historische seizoensbronnen. Bestaande CSV’s en scorebladen worden nooit overschreven. Gegenereerde scorebladen blijven samen met de datastore in de gemounte map staan.
 
 Maak in Portainer een Stack from Git repository met deze repository. De stack gebruikt `docker-compose.yml`, bouwt vanuit de repository-root, gebruikt containernaam `manillen`, restartbeleid `unless-stopped` en mount `/volume1/manillen_data:/app/data`. Er wordt geen volledige repository in de container gemount.
 
@@ -134,9 +165,11 @@ De meegeleverde workflow staat in `.github/workflows/publish-mirror.yml` en kan 
 NAS-knop -> GitHub API -> workflow_dispatch -> publish_mirror.py -> GitHub commit -> GitHub Pages
 ```
 
+`data/seasons_history.csv`, `data/seasons_playdays_legacy.csv` en `data/hall_of_fame_check.csv` zijn opgenomen in Git en worden niet genegeerd, zodat ze beschikbaar zijn in de Portainer Stack-from-Git-build. De Hall-of-Fame-check is alleen voor tests; hij wordt niet naar GitHub Pages geüpload.
+
 ## Read-only GitHub Pages-app
 
-`mirror_app/` toont alleen Geschiedenis, Tussenstand en Parenhistoriek. Er zijn geen formulieren, score-invoer, indelingsknoppen of verwijderacties. De CSV’s in `mirror_app/data/` zijn een momentopname en worden niet live van de NAS gelezen. Op mobiel staat de navigatie sticky bovenaan met een hamburgerknop; de drie tabs klappen verticaal uit.
+`mirror_app/` toont Geschiedenis, Tussenstand, Parenhistoriek, Seizoenen en Hall of Fame. Er zijn geen formulieren, score-invoer, indelingsknoppen of verwijderacties. De CSV’s in `mirror_app/data/` zijn een momentopname en worden niet live van de NAS gelezen. Op mobiel staat de navigatie sticky bovenaan met een hamburgerknop; de tabbladen klappen verticaal uit.
 
 Werk de snapshot en GitHub Pages-export bij vanuit de repository-root:
 
@@ -148,7 +181,7 @@ git commit -m "Update Manillen Pages-app"
 git push
 ```
 
-Het script kopieert `data/pairings.csv`, `data/pairings_history.csv`, `data/scores_history.csv` en `data/reserve_assignments.csv` indien aanwezig naar `mirror_app/data/`, en voert `shinylive export mirror_app docs` uit. De snapshot met reservekoppelingen zorgt dat ingevulde reservenamen in Geschiedenis zichtbaar blijven. Git-commando’s blijven bewust handmatig.
+Het script kopieert `AllPlayers.csv`, pairing-, score- en reservegegevens, `seasons.csv`, `seasons_history.csv` en `seasons_playdays_legacy.csv` indien aanwezig naar `mirror_app/data/`, en voert `shinylive export mirror_app docs` uit. De Pages-app gebruikt deze snapshot voor seizoensfilters, historische tabbladen en reserveweergave. `hall_of_fame_check.csv` wordt niet gepubliceerd. Git-commando’s blijven bewust handmatig.
 
 GitHub Pages wordt gedeployed door `.github/workflows/deploy-pages.yml`. Na een push naar `main` is de publieke projectsite beschikbaar op `https://nubrodr.github.io/Manillen/`.
 
@@ -163,8 +196,12 @@ shiny run mirror_app/app.py
 - `AllPlayers.csv`: CSV zonder header, met één spelersnaam per regel.
 - `pairings.csv`: CSV met de kolommen `Player1`, `Player2` en `Count`; elke rij is een ongesorteerd partnerpaar met de actuele telling.
 - `pairings_history.csv`: CSV met `Date`, `Table` en `Players`; de vier spelers staan in één veld, gescheiden door ` | `.
+- `pairings_history.csv` bevat daarnaast `Season`; de migratie voegt die kolom veilig toe aan bestaande volumes.
 - `scores_history.csv`: CSV met `Date`, `Table`, `Game`, `Team1Players`, `Team2Players`, `Team1Score` en `Team2Score`.
 - `reserve_assignments.csv`: CSV met `Date`, `Slot` en `Name`; bewaart ingevulde reservenamen per speeldag.
+- `seasons.csv`: tool-seizoenen met `Season`, `SeasonNumber`, `SeasonStartYear` en `Status`.
+- `seasons_history.csv` en `seasons_playdays_legacy.csv`: read-only brondata voor vroegere seizoenen en speeldagen.
+- `hall_of_fame_check.csv`: testdata; niet voor app-runtime of publicatie.
 - `Scorebladen.xlsx`: leeg Excel-template voor maximaal vier tafels.
 - `Scorebladen/`: automatisch gemaakte Excel-bestanden per speeldatum; dit zijn uitvoerbestanden en worden niet getrackt.
 

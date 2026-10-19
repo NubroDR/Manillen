@@ -6,6 +6,7 @@ from pathlib import Path
 
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 
+from data_paths import DATA_DIR
 from manillen_functions import (
     create_player_pool,
     delete_pairings_by_date,
@@ -15,37 +16,82 @@ from manillen_functions import (
     make_groups_greedy,
     update_pairs_in_csv,
 )
-from score_functions import compute_standings, get_matchups_for_table, load_scores, save_scores
+from score_functions import (
+    compute_standings,
+    get_matchups_for_table,
+    load_scores,
+    save_game_score,
+)
 from mirror_app.data_helpers import load_pairing_counts, load_pairing_history
+from mirror_app.data_helpers import load_pairing_records
+from mirror_app.season_helpers import (
+    DEFAULT_SEASON,
+    MIN_GAMES_FOR_AWARD,
+    append_season_and_close_current,
+    compute_hall_of_fame,
+    compute_closed_season_awards,
+    ensure_season_data,
+    get_active_season,
+    load_legacy_seasons,
+    load_seasons,
+    next_season_values,
+    reopen_season,
+)
 from reserve_assignments import (
     DEFAULT_ASSIGNMENTS_FILE,
     get_reserve_assignments,
     required_reserve_count,
+    reserve_name_matches_pool,
+    resolve_reserve_name,
     save_reserve_assignments,
 )
 from github_publish import GitHubPublishError, trigger_mirror_workflow
 
 
 BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR / "data"
 CSV_PAIRINGS = DATA_DIR / "pairings.csv"
 ALL_PLAYERS_FILE = DATA_DIR / "AllPlayers.csv"
 HISTORY_FILE = DATA_DIR / "pairings_history.csv"
 SCOREBLAD_TEMPLATE = DATA_DIR / "Scorebladen.xlsx"
 SCOREBLAD_OUTPUT_DIR = DATA_DIR / "Scorebladen"
 SCORES_FILE = DATA_DIR / "scores_history.csv"
+SEASONS_FILE = DATA_DIR / "seasons.csv"
+LEGACY_SEASONS_FILE = DATA_DIR / "seasons_history.csv"
+LEGACY_PLAYDAYS_FILE = DATA_DIR / "seasons_playdays_legacy.csv"
 RESERVE_ASSIGNMENTS_FILE = DEFAULT_ASSIGNMENTS_FILE
+ensure_season_data(DATA_DIR)
 APP_CSS = (BASE_DIR / "www" / "manillen.css").read_text(encoding="utf-8")
 
 
-def _history_dates():
-    return sorted(load_pairing_history(HISTORY_FILE), reverse=True)
+def _history_dates(season=None):
+    return sorted(
+        {
+            row["Date"]
+            for row in load_pairing_records(HISTORY_FILE)
+            if season is None or row["Season"] == season
+        },
+        reverse=True,
+    )
 
 
 def _read_history():
     return {
         play_date: [(str(table), players) for table, players in tables]
         for play_date, tables in load_pairing_history(HISTORY_FILE).items()
+    }
+
+
+def _history_for_season(season=None):
+    grouped = {}
+    for row in load_pairing_records(HISTORY_FILE):
+        if season is not None and row["Season"] != season:
+            continue
+        grouped.setdefault(row["Date"], []).append(
+            (str(row["Table"]), row["Players"])
+        )
+    return {
+        play_date: sorted(tables, key=lambda item: int(item[0]))
+        for play_date, tables in grouped.items()
     }
 
 
@@ -82,8 +128,117 @@ def _pairings_table(selected_player=None):
     )
 
 
+def _closed_tool_awards():
+    return compute_closed_season_awards(
+        SEASONS_FILE,
+        SCORES_FILE,
+        HISTORY_FILE,
+        players,
+        MIN_GAMES_FOR_AWARD,
+    )
+
+
+def _seasons_overview():
+    legacy = load_legacy_seasons(LEGACY_SEASONS_FILE, LEGACY_PLAYDAYS_FILE)
+    rows = [
+        (
+            f"S{row['SeasonNumber']}",
+            row["Season"],
+            str(row["Pool"]),
+            row["Gold"],
+            row["Silver"],
+            row["Bronze"],
+            row["RedLantern"],
+            row["Playdays"],
+        )
+        for row in legacy
+    ]
+    awards_by_season = dict(_closed_tool_awards())
+    for season in load_seasons(SEASONS_FILE):
+        awards = awards_by_season.get(season["Season"], {})
+        rows.append((
+            f"S{season['SeasonNumber']}",
+            season["Season"],
+            str(len(players)),
+            awards.get("Gold", ""),
+            awards.get("Silver", ""),
+            awards.get("Bronze", ""),
+            awards.get("RedLantern", ""),
+            [],
+        ))
+    if not rows:
+        return ui.div("Nog geen seizoenen gevonden.", class_="empty-state")
+    table_rows = []
+    for number, label, pool_size, gold, silver, bronze, lantern, playdays in rows:
+        playday_lines = [
+            f"{row.get('Date', '')} · {row.get('Location', '')} "
+            f"({row.get('Players', '')}/{row.get('Pool', '')})"
+            for row in playdays
+        ]
+        table_rows.append(ui.tags.tr(
+            ui.tags.td(html.escape(number)),
+            ui.tags.td(html.escape(label)),
+            ui.tags.td(html.escape(pool_size)),
+            ui.tags.td(html.escape(gold)),
+            ui.tags.td(html.escape(silver)),
+            ui.tags.td(html.escape(bronze)),
+            ui.tags.td(html.escape(lantern)),
+            ui.tags.td(
+                *[ui.div(html.escape(line)) for line in playday_lines]
+                if playday_lines else ["—"]
+            ),
+        ))
+    return ui.div(
+        ui.tags.table(
+            ui.tags.thead(ui.tags.tr(
+                ui.tags.th("Seizoen"), ui.tags.th("Label"), ui.tags.th("Pool"),
+                ui.tags.th("Beker"), ui.tags.th("Zilver"), ui.tags.th("Brons"),
+                ui.tags.th("Rode lantaarn"), ui.tags.th("Speeldagen"),
+            )),
+            ui.tags.tbody(*table_rows),
+            class_="data-table",
+        ),
+        class_="table-scroll",
+    )
+
+
+def _hall_of_fame_table():
+    rows = compute_hall_of_fame(
+        players,
+        LEGACY_SEASONS_FILE,
+        _closed_tool_awards(),
+    )
+    if not rows:
+        return ui.div("Nog geen Hall of Fame-resultaten.", class_="empty-state")
+    table_rows = [
+        ui.tags.tr(
+            ui.tags.td(html.escape(row["Player"])),
+            ui.tags.td(str(row["Gold"]), class_="numeric"),
+            ui.tags.td(str(row["Silver"]), class_="numeric"),
+            ui.tags.td(str(row["Bronze"]), class_="numeric"),
+            ui.tags.td(str(row["RedLantern"]), class_="numeric"),
+        )
+        for row in rows
+    ]
+    return ui.div(
+        ui.tags.table(
+            ui.tags.thead(ui.tags.tr(
+                ui.tags.th("Speler"), ui.tags.th("Goud"), ui.tags.th("Zilver"),
+                ui.tags.th("Brons"), ui.tags.th("Rode lantaarn"),
+            )),
+            ui.tags.tbody(*table_rows),
+            class_="data-table",
+        ),
+        class_="table-scroll",
+    )
+
+
 def _score_input_id(table, game, team):
     return f"score_t{table}_g{game}_{team}"
+
+
+def _save_game_id(table, game):
+    return f"save_score_t{table}_g{game}"
 
 
 def _scoreblad_file_for_date(play_date):
@@ -95,6 +250,7 @@ def _scoreblad_file_for_date(play_date):
 
 def _score_entry_tables(play_date):
     history = _read_history().get(play_date, [])
+    reserve_names = get_reserve_assignments(play_date, RESERVE_ASSIGNMENTS_FILE)
     existing = {
         (row["Table"], row["Game"]): row
         for row in load_scores(str(SCORES_FILE), play_date)
@@ -108,14 +264,21 @@ def _score_entry_tables(play_date):
         games = []
         for game, (team1, team2) in enumerate(get_matchups_for_table(table_players), start=1):
             row = existing.get((table, game), {})
+            display_team1 = [resolve_reserve_name(player, reserve_names) for player in team1]
+            display_team2 = [resolve_reserve_name(player, reserve_names) for player in team2]
             games.append(
                 ui.div(
                     ui.div(f"Spel {game}", class_="score-game-title"),
-                    ui.div(" + ".join(team1), class_="score-team"),
+                    ui.div(" + ".join(html.escape(name) for name in display_team1), class_="score-team"),
                     ui.input_numeric(_score_input_id(table, game, "team1"), "Team 1", value=row.get("Team1Score")),
                     ui.div("vs", class_="score-vs"),
                     ui.input_numeric(_score_input_id(table, game, "team2"), "Team 2", value=row.get("Team2Score")),
-                    ui.div(" + ".join(team2), class_="score-team"),
+                    ui.div(" + ".join(html.escape(name) for name in display_team2), class_="score-team"),
+                    ui.input_action_button(
+                        _save_game_id(table, game),
+                        "Spel opslaan",
+                        class_="btn-success",
+                    ),
                     class_="score-game",
                 )
             )
@@ -123,8 +286,14 @@ def _score_entry_tables(play_date):
     return ui.div(*sections, class_="score-tables")
 
 
-def _standings_table(play_date=None):
-    rows = compute_standings(str(SCORES_FILE), play_date)
+def _standings_table(play_date=None, season=None):
+    rows = compute_standings(
+        str(SCORES_FILE),
+        play_date,
+        season=season,
+        history_filename=str(HISTORY_FILE),
+        reserve_assignments_filename=str(RESERVE_ASSIGNMENTS_FILE),
+    )
     if not rows:
         return ui.div("Nog geen scores ingevoerd.", class_="empty-state")
 
@@ -150,7 +319,7 @@ def _standings_table(play_date=None):
         table_rows.append(
             ui.tags.tr(
                 ui.tags.td(str(index + 1)),
-                ui.tags.td(player_display),
+                ui.tags.td(html.escape(player_display)),
                 ui.tags.td(str(row["wins"])),
                 ui.tags.td(str(row["games_played"])),
                 ui.tags.td(str(row["points_for"])),
@@ -160,13 +329,16 @@ def _standings_table(play_date=None):
             )
         )
 
-    return ui.tags.table(
-        ui.tags.thead(ui.tags.tr(
-            ui.tags.th("#"), ui.tags.th("Speler"), ui.tags.th("Gewonnen"),
-            ui.tags.th("Gespeeld"), ui.tags.th("Voor"), ui.tags.th("Tegen"), ui.tags.th("Saldo")
-        )),
-        ui.tags.tbody(*table_rows),
-        class_="pairings-table standings-table",
+    return ui.div(
+        ui.tags.table(
+            ui.tags.thead(ui.tags.tr(
+                ui.tags.th("#"), ui.tags.th("Speler"), ui.tags.th("Gewonnen"),
+                ui.tags.th("Gespeeld"), ui.tags.th("Voor"), ui.tags.th("Tegen"), ui.tags.th("Saldo")
+            )),
+            ui.tags.tbody(*table_rows),
+            class_="pairings-table standings-table",
+        ),
+        ui.p("* = reservespeler.", class_="reserve-footnote"),
     )
 
 
@@ -281,8 +453,8 @@ def _table_cards(config, score=None):
     return ui.div(heading, ui.div(*cards, class_="tables-grid"), class_="configuration")
 
 
-def _history_cards():
-    history = _read_history()
+def _history_cards(season=None):
+    history = _history_for_season(season)
     if not history:
         return ui.div("Nog geen speeldagen gevonden.", class_="empty-state")
 
@@ -333,6 +505,12 @@ def _history_cards():
 
 players = sorted(load_all_players(ALL_PLAYERS_FILE), key=str.casefold)
 history_choices = _history_dates()
+seasons = load_seasons(SEASONS_FILE)
+active_season = get_active_season(SEASONS_FILE)
+season_choices = {
+    row["Season"]: f"S{row['SeasonNumber']} · {row['Season']}"
+    for row in seasons
+}
 
 app_ui = ui.page_fluid(
     ui.tags.head(
@@ -352,6 +530,12 @@ app_ui = ui.page_fluid(
             "Nieuwe speeldag",
             ui.div(
                 ui.input_date("play_date", "Speeldatum", value=date.today()),
+                ui.input_select(
+                    "play_season",
+                    "Seizoen",
+                    season_choices,
+                    selected=active_season["Season"],
+                ),
                 player_selector(players, selected=players),
                 ui.input_action_button("generate", "Genereer indeling", class_="btn-primary"),
                 ui.input_select(
@@ -375,6 +559,7 @@ app_ui = ui.page_fluid(
                 ui.layout_columns(
                     ui.output_ui("reserve_fields"),
                 ),
+                ui.output_ui("reserve_warning"),
                 ui.output_ui("reserve_controls"),
                 ui.output_ui("scoreblad_actions"),
                 ui.output_ui("scoreblad_status"),
@@ -388,8 +573,7 @@ app_ui = ui.page_fluid(
                 ui.input_select("score_entry_date", "Speeldag", history_choices or {"": "Geen historiek beschikbaar"}),
                 ui.output_ui("score_entry_tables"),
                 ui.output_ui("score_validation"),
-                ui.output_ui("score_entry_actions"),
-                ui.output_ui("score_entry_status"),
+                    ui.output_ui("score_entry_status"),
                 class_="panel",
             ),
         ),
@@ -397,7 +581,17 @@ app_ui = ui.page_fluid(
             "Tussenstand",
             ui.div(
                 ui.h2("Tussenstand"),
-                ui.input_select("standings_date", "Periode", {"": "Alle speeldagen (cumulatief)", **{item: item for item in history_choices}}),
+                ui.input_select(
+                    "standings_season",
+                    "Seizoen",
+                    {"": "Alle seizoenen", **season_choices},
+                    selected=active_season["Season"],
+                ),
+                ui.input_select(
+                    "standings_date",
+                    "Speeldag",
+                    {"": "Alle speeldagen", **{item: item for item in history_choices}},
+                ),
                 ui.output_ui("standings"),
                 class_="panel",
             ),
@@ -406,9 +600,43 @@ app_ui = ui.page_fluid(
             "Speeldagen",
             ui.div(
                 ui.h2("Speeldagen"),
+                ui.input_select(
+                    "history_season",
+                    "Seizoen",
+                    {"": "Alle seizoenen", **season_choices},
+                    selected=active_season["Season"],
+                ),
                 ui.input_action_button("publish_mirror", "Publiceer data", class_="btn-primary"),
                 ui.output_ui("publish_status"),
                 ui.output_ui("history"),
+                class_="panel",
+            ),
+        ),
+        ui.nav_panel(
+            "Seizoenen",
+            ui.div(
+                ui.h2("Seizoenen"),
+                ui.input_action_button("new_season", "Nieuw seizoen", class_="btn-primary"),
+                ui.input_select(
+                    "reopen_season",
+                    "Afgesloten seizoen heropenen",
+                    {
+                        row["Season"]: f"S{row['SeasonNumber']} · {row['Season']}"
+                        for row in seasons
+                        if row["Status"] == "afgesloten"
+                    } or {"": "Geen afgesloten seizoenen"},
+                ),
+                ui.input_action_button("reopen_season_action", "Heropen seizoen"),
+                ui.output_ui("season_status"),
+                ui.output_ui("seasons_overview"),
+                class_="panel",
+            ),
+        ),
+        ui.nav_panel(
+            "Hall of Fame",
+            ui.div(
+                ui.h2("Hall of Fame"),
+                ui.output_ui("hall_of_fame"),
                 class_="panel",
             ),
         ),
@@ -445,6 +673,8 @@ def server(input: Inputs, output: Outputs, session: Session):
     publish_message = reactive.Value[tuple[str, str] | None](None)
     publish_running = reactive.Value(False)
     reserve_message = reactive.Value[tuple[str, str] | None](None)
+    season_message = reactive.Value[tuple[str, str] | None](None)
+    season_clicks = reactive.Value[dict[str, int]]({})
     delete_clicks = reactive.Value[dict[str, int]]({})
     pending_delete = reactive.Value[str | None](None)
 
@@ -540,7 +770,13 @@ def server(input: Inputs, output: Outputs, session: Session):
     def save_config():
         try:
             _, config = configuration_state()[selected_config() or 0]
-            update_pairs_in_csv(config, str(CSV_PAIRINGS), history_filename=str(HISTORY_FILE), play_date=input.play_date())
+            update_pairs_in_csv(
+                config,
+                str(CSV_PAIRINGS),
+                history_filename=str(HISTORY_FILE),
+                play_date=input.play_date(),
+                season=input.play_season(),
+            )
             generation_message.set(("success", f"Speeldag {input.play_date()} is bewaard."))
             history_refresh.set(history_refresh() + 1)
             ui.modal_remove()
@@ -550,7 +786,163 @@ def server(input: Inputs, output: Outputs, session: Session):
     @render.ui
     def history():
         history_refresh()
-        return _history_cards()
+        return _history_cards(input.history_season() or None)
+
+    @render.ui
+    def seasons_overview():
+        history_refresh()
+        score_refresh()
+        return _seasons_overview()
+
+    @render.ui
+    def hall_of_fame():
+        score_refresh()
+        return _hall_of_fame_table()
+
+    @render.ui
+    def season_status():
+        message = season_message()
+        if not message:
+            return ui.HTML("")
+        kind, text = message
+        return ui.div(
+            text,
+            class_=f"status {'error-status' if kind == 'error' else ''}",
+        )
+
+    @reactive.effect
+    @reactive.event(input.new_season)
+    def request_new_season():
+        try:
+            active = get_active_season(SEASONS_FILE)
+            preview_rows = compute_standings(
+                str(SCORES_FILE),
+                season=active["Season"],
+                history_filename=str(HISTORY_FILE),
+                reserve_assignments_filename=str(RESERVE_ASSIGNMENTS_FILE),
+            )
+            preview = (
+                ui.div(
+                    ui.tags.table(
+                        ui.tags.thead(ui.tags.tr(
+                            ui.tags.th("#"),
+                            ui.tags.th("Speler"),
+                            ui.tags.th("Gewonnen"),
+                            ui.tags.th("Gespeeld"),
+                            ui.tags.th("Saldo"),
+                        )),
+                        ui.tags.tbody(*[
+                            ui.tags.tr(
+                                ui.tags.td(str(index + 1)),
+                                ui.tags.td(html.escape(row["player"])),
+                                ui.tags.td(str(row["wins"])),
+                                ui.tags.td(str(row["games_played"])),
+                                ui.tags.td(str(row["point_diff"])),
+                            )
+                            for index, row in enumerate(preview_rows)
+                        ]),
+                        class_="data-table",
+                    ),
+                    class_="table-scroll",
+                )
+                if preview_rows
+                else ui.p("Nog geen scores voor dit seizoen.")
+            )
+            suggested = next_season_values(SEASONS_FILE)
+            ui.modal_show(ui.modal(
+                ui.h4(f"Seizoen {active['Season']} afsluiten?"),
+                ui.p("Controleer de eindstand. Na bevestiging wordt het volgende seizoen actief."),
+                preview,
+                ui.input_text(
+                    "new_season_label",
+                    "Naam van het nieuwe seizoen",
+                    value=suggested["Season"],
+                ),
+                ui.input_action_button(
+                    "confirm_new_season",
+                    "Bevestig en start nieuw seizoen",
+                    class_="btn-success",
+                ),
+                ui.input_action_button("cancel_new_season", "Annuleren"),
+                easy_close=False,
+            ))
+        except Exception as error:
+            season_message.set(("error", f"Nieuw seizoen starten mislukt: {error}"))
+
+    @reactive.effect
+    @reactive.event(input.cancel_new_season)
+    def cancel_new_season():
+        ui.modal_remove()
+
+    @reactive.effect
+    @reactive.event(input.confirm_new_season)
+    def confirm_new_season():
+        try:
+            append_season_and_close_current(
+                SEASONS_FILE,
+                input.new_season_label(),
+            )
+            updated = load_seasons(SEASONS_FILE)
+            choices = {
+                row["Season"]: f"S{row['SeasonNumber']} · {row['Season']}"
+                for row in updated
+            }
+            new_active = get_active_season(SEASONS_FILE)
+            ui.update_select("play_season", choices=choices, selected=new_active["Season"])
+            ui.update_select("standings_season", choices={"": "Alle seizoenen", **choices}, selected=new_active["Season"])
+            ui.update_select("history_season", choices={"": "Alle seizoenen", **choices}, selected=new_active["Season"])
+            ui.update_select(
+                "reopen_season",
+                choices={
+                    row["Season"]: f"S{row['SeasonNumber']} · {row['Season']}"
+                    for row in updated if row["Status"] == "afgesloten"
+                },
+            )
+            season_message.set(("success", f"Seizoen {new_active['Season']} is gestart."))
+            ui.modal_remove()
+            history_refresh.set(history_refresh() + 1)
+        except Exception as error:
+            season_message.set(("error", f"Seizoen afsluiten mislukt: {error}"))
+
+    @reactive.effect
+    @reactive.event(input.reopen_season_action)
+    def reopen_selected_season():
+        label = input.reopen_season()
+        if not label:
+            return
+        try:
+            reopen_season(SEASONS_FILE, label)
+            updated = load_seasons(SEASONS_FILE)
+            choices = {
+                row["Season"]: f"S{row['SeasonNumber']} · {row['Season']}"
+                for row in updated
+            }
+            active = get_active_season(SEASONS_FILE)
+            ui.update_select("play_season", choices=choices, selected=active["Season"])
+            ui.update_select("standings_season", choices={"": "Alle seizoenen", **choices}, selected=active["Season"])
+            ui.update_select("history_season", choices={"": "Alle seizoenen", **choices}, selected=active["Season"])
+            ui.update_select(
+                "reopen_season",
+                choices={
+                    row["Season"]: f"S{row['SeasonNumber']} · {row['Season']}"
+                    for row in updated if row["Status"] == "afgesloten"
+                },
+            )
+            season_message.set(("success", f"Seizoen {label} is heropend."))
+        except Exception as error:
+            season_message.set(("error", f"Seizoen heropenen mislukt: {error}"))
+
+    @reactive.effect
+    def update_standings_dates():
+        selected_season = input.standings_season() or None
+        choices = {
+            item: item for item in _history_dates(selected_season)
+        }
+        ui.update_select(
+            "standings_date",
+            choices={"": "Alle speeldagen", **choices},
+            selected="",
+        )
 
     @reactive.effect
     @reactive.event(input.score_navigation)
@@ -611,15 +1003,6 @@ def server(input: Inputs, output: Outputs, session: Session):
         return _score_entry_tables(input.score_entry_date())
 
     @render.ui
-    def score_entry_actions():
-        if not input.score_entry_date() or not _read_history().get(input.score_entry_date(), []):
-            return ui.HTML("")
-        return ui.div(
-            ui.input_action_button("save_scores", "Scores opslaan", class_="btn-success"),
-            class_="action-row",
-        )
-
-    @render.ui
     def score_validation():
         history_refresh()
         warnings = []
@@ -634,36 +1017,58 @@ def server(input: Inputs, output: Outputs, session: Session):
             return ui.HTML("")
         return ui.div(*warnings, class_="score-warning")
 
+    saved_games = reactive.Value[dict[tuple[str, int, int], int]]({})
+
     @reactive.effect
-    @reactive.event(input.save_scores)
-    def save_all_scores():
+    def save_game_handlers():
+        history_refresh()
         play_date = input.score_entry_date()
-        history = _read_history().get(play_date, [])
-        try:
-            all_table_scores = []
-            for table_text, table_players in history:
-                table = int(table_text)
-                games = []
-                for game, (team1, team2) in enumerate(
-                    get_matchups_for_table(table_players), start=1
-                ):
+        if not play_date:
+            return
+        clicks = saved_games()
+        for table_text, table_players in _read_history().get(play_date, []):
+            table = int(table_text)
+            for game, (team1, team2) in enumerate(
+                get_matchups_for_table(table_players), start=1
+            ):
+                key = (play_date, table, game)
+                current = getattr(input, _save_game_id(table, game))() or 0
+                if current <= clicks.get(key, 0):
+                    continue
+                saved_games.set({**clicks, key: current})
+                try:
                     team1_score = getattr(input, _score_input_id(table, game, "team1"))()
                     team2_score = getattr(input, _score_input_id(table, game, "team2"))()
                     if team1_score is None or team2_score is None:
-                        raise ValueError(f"Vul alle 3 scores in voor tafel {table}.")
-                    if team1_score < 0 or team2_score < 0 or int(team1_score) != team1_score or int(team2_score) != team2_score:
-                        raise ValueError(f"Scores voor tafel {table} moeten niet-negatieve gehele getallen zijn.")
-                    games.append({
-                        "team1": team1, "team2": team2,
-                        "team1_score": int(team1_score), "team2_score": int(team2_score),
-                    })
-                all_table_scores.append((table, games))
-            for table, games in all_table_scores:
-                save_scores(play_date, table, games, str(SCORES_FILE))
-            score_refresh.set(score_refresh() + 1)
-            score_message.set(("success", f"Scores voor {play_date} zijn opgeslagen."))
-        except Exception as error:
-            score_message.set(("error", str(error)))
+                        raise ValueError("Vul beide scores van dit spel in.")
+                    if (
+                        team1_score < 0
+                        or team2_score < 0
+                        or int(team1_score) != team1_score
+                        or int(team2_score) != team2_score
+                    ):
+                        raise ValueError("Scores moeten niet-negatieve gehele getallen zijn.")
+                    save_game_score(
+                        play_date,
+                        table,
+                        game,
+                        team1,
+                        team2,
+                        int(team1_score),
+                        int(team2_score),
+                        str(SCORES_FILE),
+                    )
+                    score_refresh.set(score_refresh() + 1)
+                    score_message.set((
+                        "success",
+                        f"Score voor tafel {table}, spel {game} is opgeslagen.",
+                    ))
+                except Exception as error:
+                    score_message.set((
+                        "error",
+                        f"Opslaan van tafel {table}, spel {game} mislukt: {error}",
+                    ))
+                clicks = saved_games()
 
     @render.ui
     def score_entry_status():
@@ -677,7 +1082,8 @@ def server(input: Inputs, output: Outputs, session: Session):
     def standings():
         score_refresh()
         selected_date = input.standings_date() or None
-        return _standings_table(selected_date)
+        selected_season = input.standings_season() or None
+        return _standings_table(selected_date, selected_season)
 
     @reactive.effect
     def delete_handlers():
@@ -761,6 +1167,24 @@ def server(input: Inputs, output: Outputs, session: Session):
             for slot_number in range(1, count + 1)
         ]
         return ui.div(*fields, class_="reserve-fields")
+
+    @render.ui
+    def reserve_warning():
+        play_date = input.score_date()
+        if not play_date:
+            return ui.HTML("")
+        count = reserve_count_for_date(play_date)
+        warnings = []
+        for slot_number in range(1, count + 1):
+            value = getattr(input, f"reserve{slot_number}", None)
+            name = value() if value else None
+            if name and reserve_name_matches_pool(name, players):
+                warnings.append(
+                    f"{name.strip()} staat in de spelerspool; controleer of dit een reservespeler is."
+                )
+        if not warnings:
+            return ui.HTML("")
+        return ui.div(*warnings, class_="score-warning")
 
     @render.ui
     def reserve_controls():

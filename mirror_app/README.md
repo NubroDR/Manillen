@@ -1,6 +1,8 @@
 # Manillen voor GitHub Pages
 
-Deze map bevat een alleen-lezen Shiny for Python-app voor GitHub Pages. De CSV-bestanden in `data/` zijn een snapshot; de app schrijft nooit naar deze bestanden. Naast de indelings- en scoredata bevat de snapshot ook `reserve_assignments.csv`, zodat ingevulde reservenamen in Geschiedenis zichtbaar blijven.
+Deze map bevat een alleen-lezen Shiny for Python-app voor GitHub Pages. De CSV-bestanden in `data/` zijn een momentopname; de app schrijft nooit naar deze bestanden. De momentopname bevat ook `AllPlayers.csv`, de seizoensregistratie en de twee historische seizoensbronnen. Zo kunnen Seizoenen, Hall of Fame, seizoensfilters en de per speeldag ingevulde reservenamen worden getoond. `hall_of_fame_check.csv` is uitsluitend testdata en wordt niet gepubliceerd.
+
+Tussenstand en Speeldagen starten met het actieve seizoen als filter. De tussenstand kan daarnaast op één speeldag worden gefilterd. Parenhistoriek behoudt zijn bestaande spelerzoekfilter en gebruikt de all-time paringteller.
 
 ## Lokaal testen
 

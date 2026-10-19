@@ -18,6 +18,10 @@ SNAPSHOT_FILES = (
     "pairings_history.csv",
     "scores_history.csv",
     "reserve_assignments.csv",
+    "AllPlayers.csv",
+    "seasons.csv",
+    "seasons_history.csv",
+    "seasons_playdays_legacy.csv",
 )
 
 

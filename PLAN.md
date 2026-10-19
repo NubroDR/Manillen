@@ -161,7 +161,7 @@ Bij het aanmaken van een speeldag wordt het actuele actieve seizoen opgeslagen i
 6. **Seizoenen- en Hall-of-Famepagina’s:** UTF-8-historische overzichten, twee NAS-tabs, legacy Hall of Fame-test tegen `hall_of_fame_check.csv` en awards van afgesloten tool-seizoenen.
 7. **Read-only app, snapshots en README:** snapshot-allowlists/API-upload, seedgedrag, nieuwe tabs, export naar `docs/`, test-fixture uitsluiten van publicatie; documenteer alle gedrags-/datamodelwijzigingen en de handmatige NAS-backup.
 
-Elke stap is afzonderlijk te testen en te reviewen. Werk bestaande CSV’s alleen via expliciete, behoudende migratie-/updatefuncties bij; testdata gebruikt tijdelijke directories. Werk de README in dezelfde stap bij wanneer die functionaliteit, data, deployment of workflows beschrijft; documentatie wordt niet tot stap 7 uitgesteld. Voeg de drie opgegeven seizoens-/testbestanden expliciet toe aan Git; ze staan nu ongetrackt, maar worden niet door `.gitignore` uitgesloten.
+Elke stap is afzonderlijk te testen en te reviewen. Werk bestaande CSV’s alleen via expliciete, behoudende migratie-/updatefuncties bij; testdata gebruikt tijdelijke directories. Werk de README in dezelfde stap bij wanneer die functionaliteit, data, deployment of workflows beschrijft; documentatie wordt niet tot stap 7 uitgesteld. `data/seasons_history.csv`, `data/seasons_playdays_legacy.csv` en `data/hall_of_fame_check.csv` zijn opgenomen in Git en worden niet door `.gitignore` uitgesloten.
 
 ## Testplan
 
@@ -179,29 +179,20 @@ Voeg `requirements-dev.txt` met pytest en een kleine testsuite toe, bijvoorbeeld
 - **Nieuw/heropen seizoen:** preview moet vóór afsluiten zichtbaar zijn; bevestiging sluit oud seizoen en maakt nieuw seizoen actief; `Heropen seizoen` herstelt status en awards blijven uit scores afgeleid. Test de veilige omgang met de reeds actieve opvolger.
 - **Publicatie en regressie:** controleer de snapshotlijst en exportbron, bevestig dat de check-CSV niet wordt opgenomen, en run de gerichte pytest-bestanden plus een Shinylive-exportcheck wanneer mirrorbestanden wijzigen.
 
-## Risico’s en open vragen
-
-Bevestigde uitgangspunten:
+## Risico’s en bevestigde besluiten
 
 - `Geschiedenis` krijgt alleen een seizoensfilter; de specifieke speeldagfilter blijft bij `Tussenstand`.
 - `Nieuw seizoen` toont een bevestigingspreview, sluit daarna het huidige actieve seizoen en maakt het nieuwe seizoen actief.
 - Seizoenslabels mogen vrij worden aangepast; `SeasonStartYear` blijft de bron voor het volgende jaarvoorstel.
 - Tool-awards zijn afgeleid van scores en poolnamen; ze worden niet als tweede bron opgeslagen.
+- `N` is 3 gespeelde spellen; spelers met minder spellen zijn niet eligible voor een tool-award.
+- Bij heropenen wordt alleen toegestaan als er geen later actief seizoen bestaat. Anders wordt de actie geweigerd en blijft alle data behouden.
+- De huidige lijst in `AllPlayers.csv` bepaalt poollidmaatschap voor tool-awards, ook voor afgesloten seizoenen.
+- Tool-seizoenen gebruiken een unieke rangschikking; alleen legacy-ties tellen als award voor iedere genoemde speler.
+- Bij minder dan vier eligible poolspelers mag dezelfde speler zowel een medaille als de rode lantaarn krijgen.
+- Het optionele heatmap-idee voor Parenhistoriek is volledig buiten scope; die pagina blijft ongewijzigd.
 - Hall of Fame toont alle huidige poolspelers, ook zonder prijzen, en voormalige poolspelers met legacyprijzen. Legacy-ties tellen voor alle betrokken spelers.
-- De genoemde drie CSV’s moeten in Git staan; ze staan op dit moment nog ongetrackt, maar niet genegeerd. Het plan moet eisen dat ze eerst expliciet worden toegevoegd/gecommit vóór Stack-from-Git deployment.
+- De drie seizoens-/test-CSV’s zijn al opgenomen in Git en niet genegeerd; de check-CSV blijft alleen voor tests en wordt niet gekopieerd of gepubliceerd.
 - De geverifieerde workflow ontvangt actuele NAS-data via de GitHub Contents API vóór dispatch; de workflow zelf gebruikt de uitgecheckte branch.
 - README-onderhoud gebeurt per relevante featurewijziging, niet pas als een laatste bulk-update.
-
-Open punten om te bevestigen vóór uitvoering:
-
-1. **Drempel N:** hoeveel spellen moet een speler minimaal gespeeld hebben om voor tool-season-awards (inclusief rode lantaarn) eligible te zijn? Dit wordt een constante.
-2. **Heropenen bij bestaande opvolger:** als S11 per ongeluk wordt afgesloten en S12 al als actief seizoen bestaat, moet `Heropen seizoen` ook S12 afsluiten, of moet heropenen alleen kunnen als er nog geen opvolger is/gebruikt wordt? De actie mag geen speeldaggegevens verwijderen.
-3. **Poollijst over tijd:** awards worden dynamisch berekend uit scores en `AllPlayers.csv`. Als een speler later uit `AllPlayers.csv` verdwijnt, vervalt diens tool-award; bevestig dat de actuele poollijst ook voor gesloten seizoenen de bedoelde bron is, of dat poollidmaatschap per seizoen op een andere manier moet worden bewaard.
-4. **Weinig eligible spelers:** als minder dan vier poolspelers aan N gespeelde spellen voldoen, kunnen een medaillepositie en de rode lantaarn op dezelfde persoon vallen. Bevestig of dit volgens de letterlijke ranking mag gebeuren of dat voor die situatie geen award wordt toegekend.
-
-## Vragen vóór implementatie
-
-- Wat moet de waarde van N zijn?
-- Hoe moet `Heropen seizoen` zich gedragen als een opvolgend actief seizoen al bestaat?
-- Moet `AllPlayers.csv` de pool voor alle gesloten tool-seizoenen blijven bepalen als spelers later uit de lijst verdwijnen?
-- Als minder dan vier spelers aan N voldoen, mag dezelfde speler dan een medaille en de rode lantaarn krijgen?
+- De tests en importsmoketest gebruiken tijdelijke data via `MANILLEN_DATA_DIR`; de echte `/app/data`-mount is tijdens validatie niet gemigreerd. Maak vóór de eerste NAS-redeploy de afgesproken handmatige backup en controleer de eerste migratie op de NAS.

@@ -4,12 +4,28 @@ import csv
 from datetime import date
 from pathlib import Path
 
+from data_paths import DATA_DIR
 from mirror_app.data_helpers import load_pairing_history
 
 
-DATA_DIR = Path(__file__).resolve().parent / "data"
 DEFAULT_ASSIGNMENTS_FILE = DATA_DIR / "reserve_assignments.csv"
 ASSIGNMENT_HEADERS = ("Date", "Slot", "Name")
+
+
+def reserve_name_matches_pool(name, pool_players):
+    """Return whether a proposed reserve label duplicates a pool player's name."""
+    candidate = str(name).strip().casefold()
+    return bool(candidate) and any(
+        candidate == str(player).strip().casefold()
+        for player in pool_players
+    )
+
+
+def resolve_reserve_name(player, assignments):
+    """Resolve a reserve slot to its entered name, preserving unknown slots."""
+    if str(player).casefold().startswith("reserve "):
+        return assignments.get(player, player)
+    return player
 
 
 def _date_value(play_date):

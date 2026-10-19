@@ -2,21 +2,31 @@ import csv
 from datetime import date
 from pathlib import Path
 
+from data_paths import DATA_DIR
 from mirror_app.score_helpers import (
     compute_standings as _compute_standings,
     load_scores as _load_scores,
 )
 
 
-DATA_DIR = Path(__file__).resolve().parent / "data"
-
-
 def load_scores(scores_filename=str(DATA_DIR / "scores_history.csv"), play_date=None):
     return _load_scores(scores_filename, play_date)
 
 
-def compute_standings(scores_filename=str(DATA_DIR / "scores_history.csv"), play_date=None):
-    return _compute_standings(scores_filename, play_date)
+def compute_standings(
+    scores_filename=str(DATA_DIR / "scores_history.csv"),
+    play_date=None,
+    season=None,
+    history_filename=None,
+    reserve_assignments_filename=None,
+):
+    return _compute_standings(
+        scores_filename,
+        play_date,
+        season=season,
+        history_filename=history_filename,
+        reserve_assignments_filename=reserve_assignments_filename,
+    )
 
 
 SCORES_HEADER = [
@@ -124,3 +134,57 @@ def save_scores(play_date, table, game_scores, scores_filename=str(DATA_DIR / "s
     return str(path)
 
 
+def save_game_score(
+    play_date,
+    table,
+    game,
+    team1,
+    team2,
+    team1_score,
+    team2_score,
+    scores_filename=str(DATA_DIR / "scores_history.csv"),
+):
+    """Insert or replace the score for one game without touching other games."""
+    play_date = _score_date(play_date)
+    try:
+        table_number = int(table)
+        game_number = int(game)
+    except (TypeError, ValueError) as error:
+        raise ValueError("table and game must be integers") from error
+    if table_number < 1:
+        raise ValueError("table must be positive")
+    if game_number not in (1, 2, 3):
+        raise ValueError("game must be between 1 and 3")
+    if not team1 or not team2:
+        raise ValueError("each game must contain both teams")
+
+    new_row = {
+        "Date": play_date,
+        "Table": str(table_number),
+        "Game": str(game_number),
+        "Team1Players": _team_value(team1),
+        "Team2Players": _team_value(team2),
+        "Team1Score": str(_score_value(team1_score)),
+        "Team2Score": str(_score_value(team2_score)),
+    }
+    path = Path(scores_filename)
+    rows = []
+    if path.exists():
+        with path.open("r", encoding="utf-8", newline="") as file:
+            rows = [
+                {header: row.get(header, "") for header in SCORES_HEADER}
+                for row in csv.DictReader(file)
+                if not (
+                    row.get("Date") == play_date
+                    and row.get("Table") == str(table_number)
+                    and row.get("Game") == str(game_number)
+                )
+            ]
+    rows.append(new_row)
+    rows.sort(key=lambda row: (row["Date"], int(row["Table"]), int(row["Game"])))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=SCORES_HEADER)
+        writer.writeheader()
+        writer.writerows(rows)
+    return str(path)
