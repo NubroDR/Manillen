@@ -76,6 +76,7 @@ def save_pairings_history(
     play_date=None,
     history_filename=str(DATA_DIR / 'pairings_history.csv'),
     season=DEFAULT_SEASON,
+    location="",
 ):
     """Save a table pairing configuration to a history CSV file."""
     if play_date is None:
@@ -88,7 +89,7 @@ def save_pairings_history(
         migrate_pairing_history(history_path)
     file_exists = history_path.exists()
 
-    fieldnames = ['Date', 'Table', 'Players', 'Season']
+    fieldnames = ['Date', 'Table', 'Players', 'Season', 'Location']
     if file_exists:
         with history_path.open('r', encoding='utf-8', newline='') as existing:
             fieldnames = list(csv.DictReader(existing).fieldnames or fieldnames)
@@ -102,6 +103,7 @@ def save_pairings_history(
                 'Table': table_number,
                 'Players': ' | '.join(group),
                 'Season': season,
+                'Location': str(location or '').strip(),
             }
             writer.writerow([values.get(field, '') for field in fieldnames])
 
@@ -490,6 +492,7 @@ def update_pairs_in_csv(
     history_filename=None,
     play_date=None,
     season=DEFAULT_SEASON,
+    location="",
 ):
     """
     Update CSV with pairs from the chosen configuration.
@@ -525,6 +528,7 @@ def update_pairs_in_csv(
             play_date=play_date,
             history_filename=history_filename,
             season=season,
+            location=location,
         )
 
     print(f"Updated {csv_filename} with {pairs_added} pairs (Reserve pairs excluded)")

@@ -59,7 +59,7 @@ Kortom: als een wijziging "groot" is, dan is een README-update verplicht. Als ee
 ├── data/
 │   ├── AllPlayers.csv        # Beschikbare spelers, één naam per regel.
 │   ├── pairings.csv          # Partnerhistoriek met Player1, Player2, Count.
-│   ├── pairings_history.csv  # Opgeslagen tafels per Date, Table en Players.
+│   ├── pairings_history.csv  # Opgeslagen tafels per Date, Table, Players, Season en Location.
 │   ├── scores_history.csv    # Scores per Date, Table en Game.
 │   ├── reserve_assignments.csv # Ingevulde reservenamen per Date en Slot.
 │   ├── Scorebladen.xlsx      # Leeg Excel-template.
@@ -113,7 +113,7 @@ In de tussenstand worden spelers eerst gesorteerd op gewonnen spellen, daarna op
 
 ## Seizoenen en prijzen
 
-`data/seasons.csv` is het register van tool-seizoenen met uitsluitend `Season`, `SeasonNumber`, `SeasonStartYear` en `Status`. Een nieuwe speeldag krijgt standaard het actieve seizoen, maar het seizoen is vóór het bewaren te kiezen. `pairings_history.csv` bewaart het expliciete `Season` per tafelrij; een oude CSV zonder die kolom wordt als `2026-2027` gelezen.
+`data/seasons.csv` is het register van tool-seizoenen met uitsluitend `Season`, `SeasonNumber`, `SeasonStartYear` en `Status`. Een nieuwe speeldag krijgt standaard het actieve seizoen, maar het seizoen is vóór het bewaren te kiezen. `pairings_history.csv` bewaart `Season` en `Location` per tafelrij; oude bestanden krijgen deze kolommen veilig toegevoegd en een ontbrekend seizoen wordt als `2026-2027` gelezen. De locatie is te kiezen uit eerder gebruikte locaties of als nieuwe locatie in te voeren, en verschijnt op de tabbladen **Speeldagen** en **Seizoenen**.
 
 Bij de eerste migratie wordt vóór wijziging van `pairings_history.csv` verplicht één backup gemaakt als `pairings_history.csv.bak-pre-seasons`; een bestaande backup wordt nooit overschreven. De migratie schrijft eerst naar een tijdelijk bestand en vervangt het origineel alleen na een geslaagde write. De startup kopieert ontbrekende seedbestanden naar `/app/data`, maar vervangt geen bestaande bestanden.
 
@@ -123,7 +123,7 @@ Bij de eerste migratie wordt vóór wijziging van `pairings_history.csv` verplic
 
 Tool-seizoenen kennen prijzen alleen toe als ze zijn afgesloten. De berekening gebruikt de getoonde rangschikking en spelers uit `AllPlayers.csv`; minimaal drie gespeelde spellen zijn vereist. Reserves zijn uitgesloten van prijzen en Hall of Fame. Bij minder dan vier eligible spelers kan volgens de gekozen regel een speler zowel een medaille als de rode lantaarn krijgen. De prijzen worden steeds uit scores berekend en niet apart opgeslagen.
 
-De tabbladen **Seizoenen** en **Hall of Fame** bevatten de historische seizoenen uit `seasons_history.csv` en, voor 2023–2024 en 2024–2025, de speeldagen uit `seasons_playdays_legacy.csv`. Ties tellen voor iedere betrokken speler. De Hall of Fame toont alle huidige poolspelers, ook met nul prijzen, plus voormalige spelers met historische prijzen. `hall_of_fame_check.csv` wordt uitsluitend als testfixture gebruikt en nooit door de entrypoint, `publish_mirror.py` of `github_publish.py` gekopieerd.
+De tabbladen **Seizoenen** en **Hall of Fame** bevatten de historische seizoenen uit `seasons_history.csv` en, voor legacy-seizoenen, de speeldagen uit `seasons_playdays_legacy.csv`. Het seizoenenoverzicht toont de seizoenen antichronologisch en aanwezigen per speeldag apart van de poolgrootte; voor tool-seizoenen worden speeldagen en aanwezigen uit `pairings_history.csv` afgeleid. Ties tellen voor iedere betrokken speler. De Hall of Fame toont alle huidige poolspelers, ook met nul prijzen, plus voormalige spelers met historische prijzen; de sortering is aflopend op goud, zilver en brons, daarna oplopend op aantal rode lantaarns. `hall_of_fame_check.csv` wordt uitsluitend als testfixture gebruikt en nooit door de entrypoint, `publish_mirror.py` of `github_publish.py` gekopieerd.
 
 ## NAS-hosting
 

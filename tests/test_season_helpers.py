@@ -4,7 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from mirror_app.data_helpers import DEFAULT_SEASON, load_pairing_records
+from manillen_functions import save_pairings_history
+from mirror_app.data_helpers import (
+    DEFAULT_SEASON,
+    load_pairing_locations,
+    load_pairing_records,
+)
 from mirror_app.score_helpers import compute_standings
 from mirror_app.season_helpers import (
     MIN_GAMES_FOR_AWARD,
@@ -17,9 +22,11 @@ from mirror_app.season_helpers import (
     get_active_season,
     load_seasons,
     load_legacy_seasons,
+    load_season_playdays,
     migrate_pairing_history,
     next_season_values,
     reopen_season,
+    sort_season_rows_newest_first,
 )
 
 
@@ -42,6 +49,21 @@ def test_old_history_loads_and_migration_adds_default_season_once(tmp_path):
     assert migrate_pairing_history(history) is False
     assert history.read_bytes() == first_migrated
     assert load_pairing_records(history)[0]["Season"] == DEFAULT_SEASON
+    assert load_pairing_records(history)[0]["Location"] == ""
+
+
+def test_saving_pairing_history_persists_playday_location(tmp_path):
+    history = tmp_path / "pairings_history.csv"
+
+    save_pairings_history(
+        [["An", "Bruno", "Etienne", "Freddy"]],
+        play_date="2026-10-31",
+        history_filename=history,
+        season="2026-2027",
+        location="Brugge",
+    )
+
+    assert load_pairing_locations(history) == {"2026-10-31": "Brugge"}
 
 
 def test_migration_preserves_nonempty_seasons_and_never_overwrites_backup(tmp_path):
@@ -121,6 +143,20 @@ def test_season_lifecycle_preview_values_close_and_reopen_guard(tmp_path):
         reopen_season(register, "2026-2027")
 
 
+def test_season_rows_are_sorted_newest_first():
+    rows = [
+        (9, "2024-2025"),
+        (11, "2026-2027"),
+        (10, "2025-2026"),
+    ]
+
+    assert sort_season_rows_newest_first(rows) == [
+        (11, "2026-2027"),
+        (10, "2025-2026"),
+        (9, "2024-2025"),
+    ]
+
+
 def test_reopen_works_when_there_is_no_active_successor(tmp_path):
     register = tmp_path / "seasons.csv"
     write_csv(register, ["Season", "SeasonNumber", "SeasonStartYear", "Status"], [
@@ -166,6 +202,58 @@ def test_legacy_season_awards_can_be_canonicalized_to_the_player_pool(tmp_path):
     assert rows[0]["Silver"] == "Marc"
     assert rows[0]["Bronze"] == "Gilbert | Marc"
     assert rows[0]["RedLantern"] == "José"
+
+
+def test_hall_of_fame_sort_prioritizes_medals_then_fewer_red_lanterns(tmp_path):
+    seasons = tmp_path / "seasons_history.csv"
+    write_csv(seasons, [
+        "Season", "SeasonNumber", "Pool", "Gold", "Silver", "Bronze", "RedLantern",
+    ], [
+        {
+            "Season": "2020-2021",
+            "SeasonNumber": 1,
+            "Pool": 5,
+            "Gold": "Gold",
+            "Silver": "Silver",
+            "Bronze": "Bronze",
+            "RedLantern": "Lantern High",
+        },
+        {
+            "Season": "2021-2022",
+            "SeasonNumber": 2,
+            "Pool": 5,
+            "Gold": "Gold",
+            "Silver": "Silver",
+            "Bronze": "Bronze",
+            "RedLantern": "Lantern High",
+        },
+    ])
+
+    rows = compute_hall_of_fame(
+        ["Gold", "Silver", "Bronze", "Lantern Low", "Lantern High"],
+        seasons,
+    )
+
+    assert [row["Player"] for row in rows] == [
+        "Gold", "Silver", "Bronze", "Lantern Low", "Lantern High",
+    ]
+
+
+def test_load_season_playdays_counts_present_players_per_date(tmp_path):
+    history = tmp_path / "pairings_history.csv"
+    write_csv(history, ["Date", "Table", "Players", "Season", "Location"], [
+        {"Date": "2026-05-16", "Table": 1, "Players": "An | Bruno | Cato | Dina", "Season": "2026-2027", "Location": "Brugge"},
+        {"Date": "2026-05-16", "Table": 2, "Players": "Evi | Fred | Gijs | Hana", "Season": "2026-2027", "Location": "Brugge"},
+        {"Date": "2026-02-14", "Table": 1, "Players": "An | Bruno | Cato | Dina", "Season": "2026-2027", "Location": ""},
+        {"Date": "2026-05-16", "Table": 3, "Players": "An | Bruno | Cato | Dina", "Season": "2025-2026", "Location": "Elsewhere"},
+    ])
+
+    playdays = load_season_playdays(history, "2026-2027")
+
+    assert playdays == [
+        {"Date": "2026-02-14", "Location": "", "PlayersPresent": 4},
+        {"Date": "2026-05-16", "Location": "Brugge", "PlayersPresent": 8},
+    ]
 
 
 def test_closed_season_awards_are_derived_from_scores_and_exclude_reserves(tmp_path):

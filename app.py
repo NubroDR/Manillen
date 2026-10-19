@@ -22,8 +22,12 @@ from score_functions import (
     load_scores,
     save_game_scores,
 )
-from mirror_app.data_helpers import load_pairing_counts, load_pairing_history
-from mirror_app.data_helpers import load_pairing_records
+from mirror_app.data_helpers import (
+    load_pairing_counts,
+    load_pairing_history,
+    load_pairing_locations,
+    load_pairing_records,
+)
 from mirror_app.season_helpers import (
     DEFAULT_SEASON,
     MIN_GAMES_FOR_AWARD,
@@ -34,8 +38,10 @@ from mirror_app.season_helpers import (
     get_active_season,
     load_legacy_seasons,
     load_seasons,
+    load_season_playdays,
     next_season_values,
     reopen_season,
+    sort_season_rows_newest_first,
 )
 from reserve_assignments import (
     DEFAULT_ASSIGNMENTS_FILE,
@@ -72,6 +78,23 @@ def _history_dates(season=None):
         },
         reverse=True,
     )
+
+
+def _location_choices():
+    locations = {
+        row["Location"]
+        for row in load_pairing_records(HISTORY_FILE)
+        if row["Location"]
+    }
+    for season in load_legacy_seasons(
+        LEGACY_SEASONS_FILE, LEGACY_PLAYDAYS_FILE
+    ):
+        locations.update(
+            location
+            for row in season["Playdays"]
+            if (location := row.get("Location", "").strip())
+        )
+    return {location: location for location in sorted(locations, key=str.casefold)}
 
 
 def _read_history():
@@ -144,7 +167,7 @@ def _seasons_overview():
     )
     rows = [
         (
-            f"S{row['SeasonNumber']}",
+            row["SeasonNumber"],
             row["Season"],
             str(row["Pool"]),
             row["Gold"],
@@ -159,32 +182,42 @@ def _seasons_overview():
     for season in load_seasons(SEASONS_FILE):
         awards = awards_by_season.get(season["Season"], {})
         rows.append((
-            f"S{season['SeasonNumber']}",
+            season["SeasonNumber"],
             season["Season"],
             str(len(players)),
             awards.get("Gold", ""),
             awards.get("Silver", ""),
             awards.get("Bronze", ""),
             awards.get("RedLantern", ""),
-            [],
+            load_season_playdays(HISTORY_FILE, season["Season"]),
         ))
     if not rows:
         return ui.div("Nog geen seizoenen gevonden.", class_="empty-state")
+    rows = sort_season_rows_newest_first(rows)
     table_rows = []
     for number, label, pool_size, gold, silver, bronze, lantern, playdays in rows:
         playday_lines = [
-            f"{row.get('Date', '')} · {row.get('Location', '')} "
-            f"({row.get('Players', '')}/{row.get('Pool', '')})"
+            " · ".join(
+                part for part in (row.get("Date", ""), row.get("Location", "")) if part
+            )
+            for row in playdays
+        ]
+        attendee_counts = [
+            str(row.get("PlayersPresent", ""))
             for row in playdays
         ]
         table_rows.append(ui.tags.tr(
-            ui.tags.td(html.escape(number)),
+            ui.tags.td(html.escape(f"S{number}")),
             ui.tags.td(html.escape(label)),
             ui.tags.td(html.escape(pool_size)),
             ui.tags.td(html.escape(gold)),
             ui.tags.td(html.escape(silver)),
             ui.tags.td(html.escape(bronze)),
             ui.tags.td(html.escape(lantern)),
+            ui.tags.td(
+                *[ui.div(html.escape(count)) for count in attendee_counts]
+                if attendee_counts else ["—"]
+            ),
             ui.tags.td(
                 *[ui.div(html.escape(line)) for line in playday_lines]
                 if playday_lines else ["—"]
@@ -195,7 +228,8 @@ def _seasons_overview():
             ui.tags.thead(ui.tags.tr(
                 ui.tags.th("Seizoen"), ui.tags.th("Label"), ui.tags.th("Pool"),
                 ui.tags.th("Goud"), ui.tags.th("Zilver"), ui.tags.th("Brons"),
-                ui.tags.th("Rode lantaarn"), ui.tags.th("Speeldagen"),
+                ui.tags.th("Rode lantaarn"), ui.tags.th("#Spelers"),
+                ui.tags.th("Speeldagen"),
             )),
             ui.tags.tbody(*table_rows),
             class_="data-table",
@@ -215,18 +249,21 @@ def _hall_of_fame_table():
     table_rows = [
         ui.tags.tr(
             ui.tags.td(html.escape(row["Player"])),
-            ui.tags.td(f"🥇 {row['Gold']}", class_="numeric rank-gold"),
-            ui.tags.td(f"🥈 {row['Silver']}", class_="numeric rank-silver"),
-            ui.tags.td(f"🥉 {row['Bronze']}", class_="numeric rank-bronze"),
-            ui.tags.td(f"🏮 {row['RedLantern']}", class_="numeric rank-lantern"),
+            ui.tags.td(str(row["Gold"]), class_="numeric rank-gold"),
+            ui.tags.td(str(row["Silver"]), class_="numeric rank-silver"),
+            ui.tags.td(str(row["Bronze"]), class_="numeric rank-bronze"),
+            ui.tags.td(str(row["RedLantern"]), class_="numeric rank-lantern"),
         )
         for row in rows
     ]
     return ui.div(
         ui.tags.table(
             ui.tags.thead(ui.tags.tr(
-                ui.tags.th("Speler"), ui.tags.th("Goud"), ui.tags.th("Zilver"),
-                ui.tags.th("Brons"), ui.tags.th("Rode lantaarn"),
+                ui.tags.th("Speler"),
+                ui.tags.th("🥇 Goud", class_="rank-gold"),
+                ui.tags.th("🥈 Zilver", class_="rank-silver"),
+                ui.tags.th("🥉 Brons", class_="rank-bronze"),
+                ui.tags.th("🏮 Rode lantaarn", class_="rank-lantern"),
             )),
             ui.tags.tbody(*table_rows),
             class_="data-table",
@@ -455,11 +492,13 @@ def _history_cards(season=None):
     future_dates = sorted(item for item in history if item > today)
     played_dates = sorted((item for item in history if item <= today), reverse=True)
     sections = []
+    locations = load_pairing_locations(HISTORY_FILE)
     if future_dates:
         sections.append(ui.h2("Toekomstige speeldag", class_="history-section-title"))
 
     for play_date in future_dates + played_dates:
         reserve_names = get_reserve_assignments(play_date, RESERVE_ASSIGNMENTS_FILE)
+        location = locations.get(play_date, "")
         tables = [
             ui.div(
                 ui.div(f"Tafel {table}", class_="history-table-title"),
@@ -477,7 +516,10 @@ def _history_cards(season=None):
         sections.append(
             ui.div(
                 ui.div(
-                    ui.h3(play_date),
+                    ui.h3(
+                        f"{play_date} - {html.escape(location)}"
+                        if location else play_date
+                    ),
                     ui.tags.button(
                         "Scores", type="button", class_="scores-button",
                         onclick=f"window.Shiny.setInputValue('score_navigation', '{play_date}', {{priority:'event'}})",
@@ -523,6 +565,20 @@ app_ui = ui.page_fluid(
             "Nieuwe speeldag",
             ui.div(
                 ui.input_date("play_date", "Speeldatum", value=date.today()),
+                ui.input_selectize(
+                    "play_location",
+                    "Locatie",
+                    {
+                        "": "Kies een bestaande locatie of typ een nieuwe",
+                        **_location_choices(),
+                    },
+                    selected="",
+                    options={
+                        "placeholder": "Kies of typ een locatie...",
+                        "create": True,
+                        "allowEmptyOption": True,
+                    },
+                ),
                 ui.input_select(
                     "play_season",
                     "Seizoen",
@@ -745,10 +801,15 @@ def server(input: Inputs, output: Outputs, session: Session):
         if not results:
             generation_message.set(("error", "Genereer eerst een indeling."))
             return
+        location = (input.play_location() or "").strip()
         ui.modal_show(
             ui.modal(
                 ui.h4("Speeldag bewaren?"),
-                ui.p(f"De indeling wordt opgeslagen voor {input.play_date()} en de paartellingen worden bijgewerkt."),
+                ui.p(
+                    f"De indeling wordt opgeslagen voor {input.play_date()}"
+                    f"{f' - {html.escape(location)}' if location else ''} "
+                    "en de paartellingen worden bijgewerkt."
+                ),
                 ui.div(
                     ui.input_action_button("confirm_save", "Ja, bewaar", class_="btn-success"),
                     ui.input_action_button("cancel_save", "Annuleren"),
@@ -774,6 +835,7 @@ def server(input: Inputs, output: Outputs, session: Session):
                 history_filename=str(HISTORY_FILE),
                 play_date=input.play_date(),
                 season=input.play_season(),
+                location=input.play_location() or "",
             )
             generation_message.set(("success", f"Speeldag {input.play_date()} is bewaard."))
             history_refresh.set(history_refresh() + 1)

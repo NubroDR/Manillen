@@ -73,7 +73,7 @@ def _ensure_preseason_backup(history_path):
 
 
 def migrate_pairing_history(history_path, default_season=DEFAULT_SEASON):
-    """Back up and atomically add/fill the explicit Season column."""
+    """Back up and atomically add/fill the Season and Location columns."""
     history_path = Path(history_path)
     if not history_path.exists():
         return False
@@ -86,8 +86,11 @@ def migrate_pairing_history(history_path, default_season=DEFAULT_SEASON):
             return False
         rows = list(reader)
 
-    fields = original_fields + (["Season"] if "Season" not in original_fields else [])
-    changed = "Season" not in original_fields
+    fields = original_fields.copy()
+    for field in ("Season", "Location"):
+        if field not in fields:
+            fields.append(field)
+    changed = fields != original_fields
     for row in rows:
         for field in fields:
             row.setdefault(field, "")
@@ -136,6 +139,11 @@ def load_seasons(seasons_path):
                 "Status": (row.get("Status") or "").strip().casefold(),
             })
     return sorted(seasons, key=lambda row: row["SeasonNumber"])
+
+
+def sort_season_rows_newest_first(rows):
+    """Sort season display rows by season number, newest first."""
+    return sorted(rows, key=lambda row: row[0], reverse=True)
 
 
 def get_active_season(seasons_path):
@@ -274,6 +282,25 @@ def load_legacy_seasons(seasons_path, playdays_path=None, pool_players=None):
     return result
 
 
+def load_season_playdays(history_path, season_label):
+    """Summarize current-tool-season dates and the attendees recorded per date."""
+    attendees_by_date = {}
+    locations_by_date = {}
+    for row in load_pairing_records(history_path):
+        if row["Season"] == season_label:
+            attendees_by_date.setdefault(row["Date"], set()).update(row["Players"])
+            if row["Location"]:
+                locations_by_date.setdefault(row["Date"], row["Location"])
+    return [
+        {
+            "Date": play_date,
+            "Location": locations_by_date.get(play_date, ""),
+            "PlayersPresent": len(attendees),
+        }
+        for play_date, attendees in sorted(attendees_by_date.items())
+    ]
+
+
 def compute_legacy_hall_of_fame(seasons_path, pool_players):
     pool_players = list(dict.fromkeys(str(name).strip() for name in pool_players if str(name).strip()))
     totals = {
@@ -353,6 +380,7 @@ def compute_hall_of_fame(pool_players, legacy_seasons_path, tool_seasons=()):
                 -item[1]["Gold"],
                 -item[1]["Silver"],
                 -item[1]["Bronze"],
+                item[1]["RedLantern"],
                 item[0].casefold(),
             ),
         )

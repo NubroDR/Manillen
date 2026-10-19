@@ -120,6 +120,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, .nav-link:focus
 .data-table td.rank-silver { background: #e9edf0; }
 .data-table td.rank-bronze { background: #f0ddca; }
 .data-table td.rank-lantern { background: #f8e0dd; }
+.data-table th.rank-gold { background: #fbe9c9; }
+.data-table th.rank-silver { background: #e9edf0; }
+.data-table th.rank-bronze { background: #f0ddca; }
+.data-table th.rank-lantern { background: #f8e0dd; }
 .pairings-table th, .pairings-table td, .data-table th, .data-table td { padding: 12px 13px; border-bottom: 1px solid var(--line); text-align: left; }
 .pairings-table th, .data-table th { color: var(--teal); font-family: 'Space Grotesk', sans-serif; white-space: nowrap; }
 .pairings-table th:last-child, .pairings-table .pair-count, .data-table .numeric { text-align: left; font-weight: 700; }

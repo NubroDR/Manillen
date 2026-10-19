@@ -9,6 +9,7 @@ try:
         load_all_players,
         load_pairing_counts,
         load_pairing_history,
+        load_pairing_locations,
         load_pairing_records,
         load_reserve_assignments,
     )
@@ -19,12 +20,15 @@ try:
         compute_closed_season_awards,
         load_legacy_seasons,
         load_seasons,
+        load_season_playdays,
+        sort_season_rows_newest_first,
     )
 except ImportError:
     from data_helpers import (
         load_all_players,
         load_pairing_counts,
         load_pairing_history,
+        load_pairing_locations,
         load_pairing_records,
         load_reserve_assignments,
     )
@@ -35,6 +39,8 @@ except ImportError:
         compute_closed_season_awards,
         load_legacy_seasons,
         load_seasons,
+        load_season_playdays,
+        sort_season_rows_newest_first,
     )
 
 
@@ -79,9 +85,11 @@ def _history_view(season=None):
     future_dates = sorted(item for item in history if item > today)
     played_dates = sorted((item for item in history if item <= today), reverse=True)
     sections = []
+    locations = load_pairing_locations(HISTORY_FILE)
     if future_dates:
         sections.append(ui.h2("Toekomstige speeldag", class_="history-section-title"))
     for play_date in future_dates + played_dates:
+        location = locations.get(play_date, "")
         reserve_names = load_reserve_assignments(RESERVE_ASSIGNMENTS_FILE).get(
             play_date, {}
         )
@@ -110,7 +118,10 @@ def _history_view(season=None):
         sections.append(
             ui.tags.section(
                 ui.div(
-                    ui.h3(play_date),
+                    ui.h3(
+                        f"{play_date} - {html.escape(location)}"
+                        if location else play_date
+                    ),
                     ui.tags.button(
                         "Scores",
                         type="button",
@@ -133,6 +144,10 @@ def _history_view(season=None):
 
 def _scores_view(play_date=None, selected_player=""):
     rows = load_scores(str(SCORES_FILE), play_date or None)
+    rows.sort(
+        key=lambda row: (row["Date"], -row["Table"], -row["Game"]),
+        reverse=True,
+    )
     reserve_names = load_reserve_assignments(RESERVE_ASSIGNMENTS_FILE)
     rows = [
         {
@@ -300,7 +315,7 @@ def _seasons_view():
     )
     rows = [
         (
-            f"S{row['SeasonNumber']}",
+            row["SeasonNumber"],
             row["Season"],
             str(row["Pool"]),
             row["Gold"],
@@ -315,36 +330,45 @@ def _seasons_view():
     for season in load_seasons(SEASONS_FILE):
         awards = awards_by_season.get(season["Season"], {})
         rows.append((
-            f"S{season['SeasonNumber']}",
+            season["SeasonNumber"],
             season["Season"],
             str(len(pool_players)),
             awards.get("Gold", ""),
             awards.get("Silver", ""),
             awards.get("Bronze", ""),
             awards.get("RedLantern", ""),
-            [],
+            load_season_playdays(HISTORY_FILE, season["Season"]),
         ))
     if not rows:
         return ui.div("Nog geen seizoenen gevonden.", class_="empty-state")
+    rows = sort_season_rows_newest_first(rows)
     table_rows = []
     for number, label, pool_size, gold, silver, bronze, lantern, playdays in rows:
         playday_items = [
             ui.div(
                 html.escape(
-                    f"{item.get('Date', '')} · {item.get('Location', '')} "
-                    f"({item.get('Players', '')}/{item.get('Pool', '')})"
+                    " · ".join(
+                        part
+                        for part in (item.get("Date", ""), item.get("Location", ""))
+                        if part
+                    )
                 )
             )
             for item in playdays
         ]
+        attendee_counts = [
+            ui.div(html.escape(str(item.get("PlayersPresent", ""))))
+            for item in playdays
+        ]
         table_rows.append(ui.tags.tr(
-            ui.tags.td(html.escape(number)),
+            ui.tags.td(html.escape(f"S{number}")),
             ui.tags.td(html.escape(label)),
             ui.tags.td(html.escape(pool_size)),
             ui.tags.td(html.escape(gold)),
             ui.tags.td(html.escape(silver)),
             ui.tags.td(html.escape(bronze)),
             ui.tags.td(html.escape(lantern)),
+            ui.tags.td(*(attendee_counts or ["—"])),
             ui.tags.td(*(playday_items or ["—"])),
         ))
     return ui.div(
@@ -352,7 +376,8 @@ def _seasons_view():
             ui.tags.thead(ui.tags.tr(
                 ui.tags.th("Seizoen"), ui.tags.th("Label"), ui.tags.th("Pool"),
                 ui.tags.th("Goud"), ui.tags.th("Zilver"), ui.tags.th("Brons"),
-                ui.tags.th("Rode lantaarn"), ui.tags.th("Speeldagen"),
+                ui.tags.th("Rode lantaarn"), ui.tags.th("#Spelers"),
+                ui.tags.th("Speeldagen"),
             )),
             ui.tags.tbody(*table_rows),
             class_="data-table",
@@ -372,16 +397,19 @@ def _hall_of_fame_view():
     return ui.div(
         ui.tags.table(
             ui.tags.thead(ui.tags.tr(
-                ui.tags.th("Speler"), ui.tags.th("Goud"), ui.tags.th("Zilver"),
-                ui.tags.th("Brons"), ui.tags.th("Rode lantaarn"),
+                ui.tags.th("Speler"),
+                ui.tags.th("🥇 Goud", class_="rank-gold"),
+                ui.tags.th("🥈 Zilver", class_="rank-silver"),
+                ui.tags.th("🥉 Brons", class_="rank-bronze"),
+                ui.tags.th("🏮 Rode lantaarn", class_="rank-lantern"),
             )),
             ui.tags.tbody(*[
                 ui.tags.tr(
                     ui.tags.td(html.escape(row["Player"])),
-                    ui.tags.td(f"🥇 {row['Gold']}", class_="numeric rank-gold"),
-                    ui.tags.td(f"🥈 {row['Silver']}", class_="numeric rank-silver"),
-                    ui.tags.td(f"🥉 {row['Bronze']}", class_="numeric rank-bronze"),
-                    ui.tags.td(f"🏮 {row['RedLantern']}", class_="numeric rank-lantern"),
+                    ui.tags.td(str(row["Gold"]), class_="numeric rank-gold"),
+                    ui.tags.td(str(row["Silver"]), class_="numeric rank-silver"),
+                    ui.tags.td(str(row["Bronze"]), class_="numeric rank-bronze"),
+                    ui.tags.td(str(row["RedLantern"]), class_="numeric rank-lantern"),
                 )
                 for row in rows
             ]),

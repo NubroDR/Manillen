@@ -29,8 +29,18 @@ def load_pairing_records(history_filename):
                 "Table": table,
                 "Players": players,
                 "Season": (row.get("Season") or "").strip() or DEFAULT_SEASON,
+                "Location": (row.get("Location") or "").strip(),
             })
     return records
+
+
+def load_pairing_locations(history_filename):
+    """Return the non-empty location recorded for each playday."""
+    locations = {}
+    for row in load_pairing_records(history_filename):
+        if row["Location"]:
+            locations.setdefault(row["Date"], row["Location"])
+    return locations
 
 
 def load_all_players(players_filename):
