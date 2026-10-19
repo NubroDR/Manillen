@@ -2,6 +2,30 @@
 
 Een Shiny for Python-app om 2v2-manillen-tafels te organiseren voor een familie-speeldag. De app zoekt een eerlijke spelersverdeling, bewaart de speeldag, genereert scorebladen en houdt scores en klassementen bij.
 
+## Projectstatus
+
+Deze repository is de actuele, werkende basis voor de volledige NAS-applicatie en de publieke read-only mirror. De hoofdapplicatie is de schrijfbare Shiny-app in `app.py`; de mirror in `mirror_app/` is een snapshot-export voor GitHub Pages. De meest recente workflow is: data wordt lokaal ingevoerd, de app bewaart en berekent de stand, en de public mirror kan handmatig via GitHub Actions worden geüpdatet.
+
+## LLM-context en wijzigingsbasis
+
+Dit README is de canonieke projectcontext voor nieuwe feature-verzoeken, bugs, refactors en AI/LLM-hulp. Gebruik dit bestand als eerste input bij een nieuw wijzigingsverzoek: het beschrijft het actuele doel van het project, de huidige architectuur, deploy-omgeving, relevante bestanden, dataflow en onderhoudsregels.
+
+Belangrijk: als een wijziging groot genoeg is om de app, de dataflow, de deploy, de interfaces of de projectstructuur te beïnvloeden, dan moet ook dit README direct worden bijgewerkt. Een verouderd README is een projectprobleem, niet alleen een documentatieprobleem.
+
+## README-onderhoudsregel
+
+Wanneer een wijziging een van deze punten raakt, werk dan dit bestand direct bij in dezelfde change:
+
+- nieuwe of gewijzigde app-functionaliteit
+- nieuwe datafiles of gewijzigde CSV/Excel-structuur
+- gewijzigde deployment of Docker/NAS-opzet
+- nieuwe GitHub Actions- of publish-workflows
+- architectural changes in `app.py`, `mirror_app/` of workflow
+- nieuwe env-vars, startup-commando's of lokale/ publieke deploy-flow
+- wijziging in spelregels, scorelogica of onderliggende berekeningen
+
+Kortom: als een wijziging "groot" is, dan is een README-update verplicht. Als een wijziging klein is maar de gebruikersworkflow of projectcontext beïnvloedt, ook dan upgraden.
+
 ## Functies
 
 - Spelers selecteren met een typeahead-selector.
@@ -83,9 +107,9 @@ docker run --rm -p 8080:8000 -v manillen_data:/app/data manillen:latest
 
 Open de app lokaal of via Tailscale op `http://<nas-hostnaam>:8080`.
 
-Het externe volume `manillen_data` moet vooraf bestaan. Bij een eerste start kopieert de entrypoint alleen ontbrekende basisbestanden naar `/app/data`, waaronder `Scorebladen.xlsx`. Bestaande CSV’s en scorebladen worden nooit overschreven. Gegenereerde scorebladen blijven samen met de datastore in het volume staan.
+De lokale `docker run`-voorbeeldopdracht gebruikt een Docker-volume met de naam `manillen_data`. De NAS-configuratie in `docker-compose.yml` gebruikt daarentegen een bind mount van `/volume1/manillen_data` naar `/app/data`; zorg dat deze map op de NAS bestaat en schrijfbaar is. Bij een eerste start kopieert de entrypoint alleen ontbrekende basisbestanden naar `/app/data`, waaronder `Scorebladen.xlsx`. Bestaande CSV’s en scorebladen worden nooit overschreven. Gegenereerde scorebladen blijven samen met de datastore in de gemounte map staan.
 
-Maak in Portainer een Stack from Git repository met deze repository. De stack gebruikt `docker-compose.yml`, bouwt vanuit de repository-root, gebruikt containernaam `manillen`, restartbeleid `unless-stopped` en mount `manillen_data:/app/data`. Het volume is als `external: true` gedeclareerd en moet dus al aangemaakt zijn. Er wordt geen volledige repository in de container gemount.
+Maak in Portainer een Stack from Git repository met deze repository. De stack gebruikt `docker-compose.yml`, bouwt vanuit de repository-root, gebruikt containernaam `manillen`, restartbeleid `unless-stopped` en mount `/volume1/manillen_data:/app/data`. Er wordt geen volledige repository in de container gemount.
 
 Beperk de toegang tot het lokale netwerk of gebruik Tailscale om de NAS-app privé te bereiken. De app gebruikt absolute paden vanuit de projectcode en blijft daardoor onafhankelijk van de working directory. Na een nieuwe GitHub-versie kies je in Portainer **Pull and redeploy** of voer je een stack-update/redeploy uit, zodat de image opnieuw wordt gebouwd; `/app/data` blijft behouden.
 
