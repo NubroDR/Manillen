@@ -3,7 +3,7 @@ from datetime import date
 from pathlib import Path
 
 from data_paths import DATA_DIR
-from mirror_app.score_helpers import (
+from manillen_core.score_helpers import (
     compute_standings as _compute_standings,
     load_scores as _load_scores,
 )

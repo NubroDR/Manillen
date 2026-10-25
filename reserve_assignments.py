@@ -5,7 +5,7 @@ from datetime import date
 from pathlib import Path
 
 from data_paths import DATA_DIR
-from mirror_app.data_helpers import load_pairing_history
+from manillen_core.data_helpers import load_pairing_history
 
 
 DEFAULT_ASSIGNMENTS_FILE = DATA_DIR / "reserve_assignments.csv"

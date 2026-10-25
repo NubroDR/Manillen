@@ -4,7 +4,7 @@ Een Shiny for Python-app om 2v2-manillen-tafels te organiseren voor een familie-
 
 ## Projectstatus
 
-Deze repository is de actuele, werkende basis voor de volledige NAS-applicatie en de read-only GitHub Pages-app. De hoofdapplicatie is de schrijfbare Shiny-app in `app.py`; de app in `mirror_app/` is een momentopname voor GitHub Pages. De meest recente workflow is: data wordt lokaal ingevoerd, de app bewaart en berekent de stand, en de GitHub Pages-weergave kan handmatig via GitHub Actions worden bijgewerkt.
+Deze repository is de actuele basis voor de volledige NAS-applicatie en de read-only GitHub Pages-app. De schrijfbare hoofdapp staat in `app.py`; de productie-URL <https://nubrodr.github.io/Manillen/> gebruikt nog de bestaande Shinylive-app uit `mirror_app/`. De nieuwe statische mirror staat alleen op de aparte preview <https://nubrodr.github.io/manillen-preview/>; de laatste previewdeploy is commit `30d631f` (Pages-run `40219277473`). Daar is de desktop-grid voor Speeldagen gecontroleerd; een compactere weergave met verticale spelersrijen en W-L naast elke speler staat nog open. De oude Shinylive-worker is op het previewpad opgeruimd en de rollback/startup is in de preview gerepeteerd en gevalideerd (F1-44). Productie-`docs/` is niet aangepast en er is geen productiecutover uitgevoerd. Zie [het implementatieplan](./plans/IMPLEMENTATIEPLAN_PROFIELEN_IDS_MOBIEL_v3.md) en [het testplan](./plans/TESTPLAN_ACCEPTATIE_v3.md) voor de overdracht, open acceptatie en eerstvolgende taak.
 
 ## LLM-context en wijzigingsbasis
 
@@ -37,7 +37,7 @@ Kortom: als een wijziging "groot" is, dan is een README-update verplicht. Als ee
 - Alle ingevulde scores voor een speeldag met één knop opslaan; onvolledige spellen worden overgeslagen met een melding.
 - Een tussenstand en speeldaggeschiedenis bekijken met een seizoensfilter.
 - Historische seizoenen en de Hall of Fame bekijken.
-- Een alleen-lezen Shinylive-app publiceren naar GitHub Pages.
+- Een alleen-lezen mirror publiceren naar GitHub Pages (de productie gebruikt nog Shinylive; de statische versie staat op de aparte preview).
 
 ## Projectstructuur
 
@@ -45,17 +45,23 @@ Kortom: als een wijziging "groot" is, dan is een README-update verplicht. Als ee
 .
 ├── app.py                    # Volledige schrijfbare NAS-app.
 ├── data_paths.py             # Data-directory, configureerbaar via MANILLEN_DATA_DIR.
+├── manillen_core/            # Gedeelde pure CSV-, seizoen- en scoreberekeningen.
 ├── manillen_functions.py     # Indeling, paringen en scorebladlogica.
 ├── score_functions.py        # Schrijfbare scoreworkflow met gedeelde scoreberekening.
 ├── reserve_assignments.py    # Datumgebonden CRUD voor ingevulde reservenamen.
-├── github_publish.py         # Veilige GitHub Actions workflow-dispatch.
+├── github_publish.py         # Uploadt alleen afgeleide JSON en dispatcht de Pages-workflow.
+├── profile_data.py           # Read-only nulmeting voor datamigratie.
 ├── requirements.txt          # Dependencies voor de volledige app.
 ├── requirements-dev.txt      # pytest en de runtime-dependencies voor tests.
 ├── Dockerfile                # Image voor de volledige NAS-app.
 ├── docker-compose.yml        # Portainer Stack-configuratie.
 ├── docker-entrypoint.sh      # Seedt een leeg /app/data-volume.
 ├── .dockerignore             # Beperkt de Docker build context.
-├── publish_mirror.py         # Snapshot kopiëren en Shinylive-export starten.
+├── publish_mirror.py         # Bouwt de statische mirror uit CSV-data of een JSON-archief.
+├── generate_static_snapshot.py # Afgeleide JSON voor de nieuwe statische mirror.
+├── build_static_site.py      # Bouwt een statische preview in een lege outputmap.
+├── site/                     # Bronbestanden van de nieuwe vanilla-JS preview.
+├── static_snapshot.zip       # JSON-only invoerarchief voor de handmatige Pages-workflow.
 ├── data/
 │   ├── AllPlayers.csv        # Beschikbare spelers, één naam per regel.
 │   ├── pairings.csv          # Partnerhistoriek met Player1, Player2, Count.
@@ -65,11 +71,9 @@ Kortom: als een wijziging "groot" is, dan is een README-update verplicht. Als ee
 │   ├── Scorebladen.xlsx      # Leeg Excel-template.
 │   └── Scorebladen/          # Gegenereerde scorebladen; lokaal genegeerd door git.
 ├── mirror_app/
-│   ├── app.py                # Alleen-lezen Shiny-app voor publicatie.
+│   ├── app.py                # Huidige alleen-lezen Shiny-app voor publicatie.
 │   ├── data/                 # Publieke snapshot van de CSV-data.
-│   ├── data_helpers.py       # Pure geschiedenis- en paringreaders.
-│   ├── season_helpers.py     # Seizoensmigratie, awards en Hall of Fame-berekening.
-│   ├── score_helpers.py      # Pure score- en klassementberekening.
+│   ├── *_helpers.py          # Compatibiliteitsre-exports uit manillen_core/.
 │   ├── requirements.txt      # Shinylive-compatibele dependency.
 │   └── README.md             # Korte handleiding voor de GitHub Pages-app.
 ├── tests/                    # Geïsoleerde pytest-suite en tijdelijke fixtures.
@@ -102,6 +106,28 @@ pytest
 ```
 
 De tests zetten `MANILLEN_DATA_DIR` naar een tijdelijke map. `tests/`, `requirements-dev.txt` en `data/hall_of_fame_check.csv` worden niet in het Docker-image opgenomen.
+
+## Datamigratie nulmeting
+
+`profile_data.py` maakt een read-only JSON-rapport met CSV-schema's en aantallen, naamvarianten en onbekende verwijzingen, ongeldige of gelijke scores, drift tussen partnercounts en pairing history, en de huidige imports en CSV-routes. Het leest standaard de geconfigureerde `MANILLEN_DATA_DIR` (of `data/`) en schrijft niets naar de datastore:
+
+```powershell
+python profile_data.py
+```
+
+Namen zijn standaard weggelaten uit het rapport. Voeg `--include-names` alleen toe voor een lokale, private mappingreview; deel of publiceer die uitvoer niet. Een alternatieve datastore kan met `--data-dir <pad>` worden gecontroleerd.
+
+## Statische mirror-preview (preview live; productiecutover open)
+
+De berekeningen voor de NAS-app en generator staan nu in `manillen_core/`; de oude `mirror_app/*_helpers.py`-imports blijven als compatibiliteitsshims bestaan. `generate_static_snapshot.py` maakt alleen afgeleide JSON en `build_static_site.py` assembleert die met de statische bronbestanden uit `site/`. Beide schrijven uitsluitend naar een expliciet opgegeven, lege outputmap. Gebruik voor tests een tijdelijke datastore:
+
+```powershell
+$env:MANILLEN_DATA_DIR = "<tijdelijke fixturemap>"
+python build_static_site.py --output "<nieuwe lege previewmap>"
+python -m http.server --directory "<previewmap>" 8000
+```
+
+`github_publish.py` genereert op de NAS een afgeleide JSON-snapshot en uploadt die als één `static_snapshot.zip`; de bron-CSV's worden niet door deze nieuwe knopstroom geüpload. De handmatige `publish-mirror.yml`-workflow assembleert het archief met `publish_mirror.py` naar `docs/`, zonder Shinylive-installatie. Deze hoofdrepo-workflow is voorbereid maar nog niet uitgevoerd. Preview-, service-worker- en rollbackacceptatie zijn op de aparte preview afgerond; de productie blijft de huidige Shinylive-export tot de resterende productieacceptatie en cutover expliciet zijn goedgekeurd.
 
 ## Tafelindeling en scores
 
@@ -146,42 +172,41 @@ Beperk de toegang tot het lokale netwerk of gebruik Tailscale om de NAS-app priv
 
 De volledige NAS-app en de read-only GitHub Pages-app zijn aparte deployments. De Docker-container voert alleen `app.py` uit en draait `mirror_app/` niet als viewer.
 
-### NAS -> GitHub Pages publiceren
+### NAS -> GitHub Pages-publicatie voorbereiden
 
-In de NAS-app staat in het tabblad Geschiedenis de knop **Publiceer data**. Deze knop start de GitHub Actions-workflow via GitHub’s `workflow_dispatch` API. De workflow voert daarna zelf `publish_mirror.py` uit, commit de nieuwe momentopname en werkt GitHub Pages bij. Een succesmelding betekent dus alleen dat de workflow is gestart; GitHub Pages kan daarna nog enige tijd nodig hebben.
+In de NAS-app staat in het tabblad Geschiedenis de knop **Publiceer data**. De nieuwe code genereert eerst lokaal een afgeleide JSON-snapshot, verpakt alleen JSON in `static_snapshot.zip`, uploadt dat ene bestand via de GitHub Contents API en start daarna de workflow via `workflow_dispatch`. De workflow assembleert de statische site, vervangt `docs/` in de workflow-checkout en commit alleen de gegenereerde site. Een succesmelding betekent alleen dat de workflow is gestart; GitHub Pages kan daarna nog enige tijd nodig hebben.
 
 De publieke projectsite staat op `https://nubrodr.github.io/Manillen/`. De URL `https://nubrodr.github.io/` is alleen de gebruikerssite van GitHub en verwijst niet automatisch naar deze repository.
 
 Stel in Portainer de volgende environment variables in voor de container:
 
-- `GITHUB_TOKEN`: verplicht; een token met voldoende rechten om de geconfigureerde workflow te dispatchen.
+- `GITHUB_TOKEN`: verplicht; een token met Contents write- en Actions write-rechten op de repository.
 - `GITHUB_REPOSITORY`: verplicht, in de vorm `owner/repository`.
 - `GITHUB_WORKFLOW`: verplicht; voor de meegeleverde workflow is dit `publish-mirror.yml`.
 - `GITHUB_REF`: optioneel; de ref waarop de workflow dispatcht, standaard `main`.
 
-De meegeleverde workflow staat in `.github/workflows/publish-mirror.yml` en kan handmatig of via de NAS-knop worden gestart. De token wordt uitsluitend uit de environment gelezen en wordt nooit in de UI, logs of foutmeldingen getoond. De NAS-app voert zelf geen `publish_mirror.py` uit en maakt geen Git-commit. De volledige flow is:
+De meegeleverde workflow staat in `.github/workflows/publish-mirror.yml` en kan handmatig of via de NAS-knop worden gestart. De token wordt uitsluitend uit de environment gelezen en wordt nooit in de UI, logs of foutmeldingen getoond. De NAS-app commit niets; de workflow commit alleen de statische uitvoer. De volledige nieuwe flow is:
 
 ```text
-NAS-knop -> GitHub API -> workflow_dispatch -> publish_mirror.py -> GitHub commit -> GitHub Pages
+NAS-knop -> JSON-generator -> static_snapshot.zip -> GitHub API -> workflow_dispatch
+         -> statische sitebouw -> docs-commit -> GitHub Pages
 ```
 
-`data/seasons_history.csv`, `data/seasons_playdays_legacy.csv` en `data/hall_of_fame_check.csv` zijn opgenomen in Git en worden niet genegeerd, zodat ze beschikbaar zijn in de Portainer Stack-from-Git-build. De Hall-of-Fame-check is alleen voor tests; hij wordt niet naar GitHub Pages geüpload.
+`data/seasons_history.csv`, `data/seasons_playdays_legacy.csv` en `data/hall_of_fame_check.csv` zijn opgenomen in Git en worden niet genegeerd, zodat ze beschikbaar zijn in de Portainer Stack-from-Git-build. De Hall-of-Fame-check is alleen voor tests; hij komt niet in de JSON-snapshot of Pages-uitvoer.
 
-## Read-only GitHub Pages-app
+## Read-only GitHub Pages-mirror
 
-`mirror_app/` toont Geschiedenis, Tussenstand, Parenhistoriek, Seizoenen en Hall of Fame. Er zijn geen formulieren, score-invoer, indelingsknoppen of verwijderacties. De CSV’s in `mirror_app/data/` zijn een momentopname en worden niet live van de NAS gelezen. Op mobiel staat de navigatie sticky bovenaan met een hamburgerknop; de tabbladen klappen verticaal uit.
+De huidige live site gebruikt nog de read-only Shinylive-app uit `mirror_app/`; de CSV’s in `mirror_app/data/` zijn een momentopname en worden niet live van de NAS gelezen. De nieuwe vanilla-JS mirror heeft zes routes en consumeert alleen afgeleide JSON. De statische site biedt standaard een lichte weergave, met een licht/donker-toggle die de keuze in de browser onthoudt; klassementmedailles en awardkolommen hebben bijpassende emoji's en kleuraccenten. CSS- en JavaScript-URL's gebruiken naast de snapshot-ID een fingerprint van de site-assets, zodat een vormgevingsupdate ook zichtbaar wordt wanneer de openbare JSON-snapshot niet is gewijzigd. De site is als preview gedeployed op <https://nubrodr.github.io/manillen-preview/>. De Pages-workflow past `prepare_legacy_pages.py` alleen toe op het deployment-artifact: statische exports blijven ongewijzigd; een legacy Shinylive-export registreert de service worker, wacht op activatie en herlaadt eenmaal als de pagina nog niet wordt bestuurd. De preview-rollback is in dezelfde browsercontext met een verse eerste load geslaagd zonder JavaScript- of consolefouten. Na herstel van de statische preview is de worker voor `/manillen-preview/` verwijderd en bleef de productie-worker voor `/Manillen/` behouden. Productie is niet gewijzigd en cutover blijft apart.
 
-Werk de snapshot en GitHub Pages-export bij vanuit de repository-root:
+Maak een lokale preview met een geïsoleerde datastore en een nieuwe, lege uitvoermap:
 
 ```powershell
-pip install -r mirror_app/requirements.txt
-python publish_mirror.py
-git add .
-git commit -m "Update Manillen Pages-app"
-git push
+$env:MANILLEN_DATA_DIR = "<tijdelijke fixturemap>"
+python build_static_site.py --data-dir $env:MANILLEN_DATA_DIR --output "<nieuwe lege previewmap>"
+python -m http.server --directory "<previewmap>" 8000
 ```
 
-Het script kopieert `AllPlayers.csv`, pairing-, score- en reservegegevens, `seasons.csv`, `seasons_history.csv` en `seasons_playdays_legacy.csv` indien aanwezig naar `mirror_app/data/`, en voert `shinylive export mirror_app docs` uit. De Pages-app gebruikt deze snapshot voor seizoensfilters, historische tabbladen en reserveweergave. `hall_of_fame_check.csv` wordt niet gepubliceerd. Git-commando’s blijven bewust handmatig.
+`publish_mirror.py --snapshot-archive static_snapshot.zip --output "<nieuwe lege uitvoermap>"` assembleert hetzelfde JSON-only snapshotarchief als de workflow. Gebruik voor een NAS-datastore geen handmatige publicatie naar Pages als vervanging voor de acceptatie- en cutoverstappen in de plannen.
 
 GitHub Pages wordt gedeployed door `.github/workflows/deploy-pages.yml`. Na een push naar `main` is de publieke projectsite beschikbaar op `https://nubrodr.github.io/Manillen/`.
 

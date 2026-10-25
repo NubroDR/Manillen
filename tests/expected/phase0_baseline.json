@@ -1,0 +1,39 @@
+{
+  "seasons": {
+    "season-alpha": [
+      ["Bob", 2, 3, 101],
+      ["Dana", 2, 3, 21],
+      ["Alice", 2, 3, 1],
+      ["Casey", 0, 3, -123]
+    ],
+    "season-beta": [
+      ["Alice", 1, 1, 61],
+      ["Bob", 1, 1, 61],
+      ["Casey", 0, 1, -61],
+      ["Dana", 0, 1, -61]
+    ],
+    "legacy-season": []
+  },
+  "playdays": {
+    "2026-01-03": [
+      ["Bob", 2, 3, 101],
+      ["Dana", 2, 3, 21],
+      ["Alice", 2, 3, 1],
+      ["Casey", 0, 3, -123]
+    ],
+    "2026-02-07": [
+      ["Alice", 1, 1, 61],
+      ["Bob", 1, 1, 61],
+      ["Casey", 0, 1, -61],
+      ["Dana", 0, 1, -61]
+    ]
+  },
+  "partner_counts": [
+    ["alice", "bob", 2],
+    ["alice", "casey", 2],
+    ["alice", "dana", 2],
+    ["bob", "casey", 2],
+    ["bob", "dana", 2],
+    ["casey", "dana", 2]
+  ]
+}

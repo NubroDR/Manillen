@@ -4,6 +4,42 @@
 
 **Basisregel voor alle tests:** gebruik uitsluitend tijdelijke testdata (`MANILLEN_DATA_DIR`); de echte `data/` blijft ongewijzigd.
 
+### Uitvoeringsstatus Fase 0 (2026-10-25)
+
+- **Geslaagd:** F0-01 t/m F0-06, F0-09 en F0-10. F0-03/F0-04 zijn als handberekende golden fixture vastgelegd in `tests/expected/phase0_baseline.json`; F0-05 bevestigt dat een gescoorde speler buiten de huidige pool in de tussenstand blijft staan (de huidige bron heeft nog geen `PoolMember`-kolom).
+- **Gedeeltelijk:** F0-07. De huidige CSV-routes en voorlopige versioned kandidaten staan in de output van `profile_data.py`; de definitieve migratielijst wordt vastgesteld wanneer de versiegrens in Fase 3 wordt ontworpen.
+- **Open:** F0-08 en F0-11. Een gecontroleerde Lighthouse-run met mobiel Slow 4G (koud en warm) is nog niet uitgevoerd; de losse browserinspectie is geen vervanging en er wordt nog geen prestatiebudget vastgesteld.
+- **Regressies:** REG-01 geslaagd (`36 passed`); REG-02 geslaagd (hashes van alle 14 bestanden onder `data/` identiek vóór en na pytest).
+
+### Uitvoeringsstatus Fase 1 (2026-10-25)
+
+- **Pytest:** volledige suite geslaagd (`52 passed`), inclusief helperpariteit voor klassementen, scores, paren en Hall of Fame op synthetische fixtures, F1-10 t/m F1-14, F1-16, F1-18, statische controles voor F1-17/F1-28 en drie tests voor de legacy rollback-helper.
+- **Browser op fixturedata:** F1-07/F1-08, relevante F1-20 t/m F1-28 en de vijf viewports uit MOB-01 zijn lokaal gecontroleerd. Dit omvat alle zes routes, actieve/all-season- en speeldagfilters, spelerzoek inclusief toegewezen reserve, refresh/back, laadstatus, vriendelijke 404-melding, XSS-tekstweergave, buildId-query's, benodigde lazy JSON-verzoeken, eigen-origin-resources, noindex, geen overflow en geen pagina-JavaScriptfouten op normale routes.
+- De ontbrekende-JSON-test forceerde bewust een 404; de UI toonde de bedoelde foutmelding. De browserconsole registreerde daarbij de verwachte 404/fetch-fout, niet een fout op een normale route.
+- **Huidige gepubliceerde snapshot, read-only:** generatoruitvoer exact vergeleken met gedeelde helpers over 11 seizoensindexitems, alle 11 klassementen/awards, 33 scores, 3 actieve speeldagen, 8 legacy-speeldagrijen, Hall of Fame en parentellingen; invoerhashes gelijk gebleven.
+- **Browser op huidige snapshot:** alle zes routes onder `/`, `/Manillen/` en `/Manillen-preview/` (18 combinaties) op 390 px. Alle routes hadden inhoud, geen horizontale overflow, alleen dezelfde origin, geen HTTP-fouten en geen JavaScriptfouten.
+- **Export-/transfercontrole:** lokale build bevatte 3 site-assets plus 16 JSON-bestanden en geen CSV's of andere bestandstypen. Gzip-berekening voor HTML/CSS/JS, manifest en actief seizoensbestand: 10.628 bytes; dit is geen gemeten HTTP-transfer of Lighthouse-score.
+- De uploadtest controleert dat alleen het JSON-archief via GitHub Contents API wordt aangeboden en dat een mislukte upload de workflow niet dispatcht. Assemblage weigert path traversal en een buildId-mismatch. De Dockerfile bevat de generator en gedeelde kern; de Shiny-app importeerde met een tijdelijke fixture.
+- `service-worker-cleanup.js` is toegevoegd aan de sitebuild; de gerichte statische-snapshottest en volledige pytest-suite slagen (`12 passed`, respectievelijk `52 passed`). F1-40/F1-41/F1-42 zijn op de HTTPS-preview uitgevoerd: na bezoek aan de oude Shinylive-preview laadde dezelfde browser na de nieuwe deploy de statische site; de worker voor `/manillen-preview/` en de cache verdwenen, terwijl de worker voor `/Manillen/` bleef bestaan.
+- De gedeelde PageSpeed Insights-run op de huidige Shinylive-site gaf `NO_FCP` (geen paint) en dus geen bruikbare performance-score; accessibility was 80. Dit sluit F0-08/F0-11 en F1-30 t/m F1-33 niet af.
+- **Workflowvalidatie:** Python-build en assemblage van het JSON-archief slagen lokaal. De previewworkflow slaagde voor de rollback (run `40214417333`) en het herstel naar statisch (run `40214498388`); de Actions-workflow van de hoofdrepo en de NAS-publicatieworkflow zijn nog niet uitgevoerd. `actionlint` en PyYAML zijn niet beschikbaar.
+- `NubroDR/manillen-preview` is publiek; Pages-run `40211116929` deployde de legacy-baseline en run `40211245371` deployde de statische preview. De previewbuild bevatte alleen 20 toegestane site-/JSON-bestanden. Op zes routes was inhoud geladen zonder console-/HTTP-fouten; 30 route-/viewportcombinaties hadden geen overflow. Touch targets en invoervelden voldeden op 360 px; hamburgermenu/Escape werkte.
+- **F1-44 geslaagd op preview:** de eerste guard-iteratie liep vast op `navigator.serviceWorker.ready`; een volgende browserproef vond een top-level `return`-syntaxfout. De definitieve helper registreert de worker expliciet, wacht op activatie en herlaadt eenmalig wanneer de pagina nog niet wordt bestuurd. In run `40214417333` werd de rollbacksite na het verwijderen van alleen de previewregistratie op de eerste navigatie actief na die ene reload: controller aanwezig, Shinylive-viewer gemount, geen page errors of consolefouten.
+- **Preview teruggezet:** commit `e89ec4c` / Pages-run `40214498388` herstelde de statische mirror. De route laadde met inhoud zonder page errors of consolefouten; de registratie voor `/manillen-preview/` en de caches waren weg, terwijl de productie-worker voor `/Manillen/` behouden bleef.
+- **Open:** handmatige echte-telefooncontrole, gecontroleerde Lighthouse-/Slow-4G-meting en budget, F1-15 op de uiteindelijke productie-`docs/` en F1-46 live-cutover. F1-43 is read-only gecontroleerd en de bestaande Shinylive-site bleef werken. Productie is niet gewijzigd.
+
+### Previewfeedback: thema en awardaccenten (2026-10-25)
+
+- **Preview geslaagd:** licht is de standaard, ongeacht OS-thema; de toegankelijke toggle wisselt en onthoudt de keuze. Lokaal controleerde Playwright alle zes routes op 360, 375, 390, 768 en 1280 px (30 combinaties): geen horizontale overflow, page errors of consolefouten. Op 360 px is de knop 44×44; donkerthema en awardrijkleuren bleven na refresh behouden. Previewcommit `7b124ba` / Pages-run `40217686913` slaagde. Op de live preview zijn de vernieuwde asset-URL's, lichte standaard, persistente toggle, gekleurde medaillerijen en Hall-of-Fame-awardkolommen bevestigd; op 360 px geen overflow.
+- Klassementen tonen opnieuw 🥇/🥈/🥉 en 🏮 voor de actieve laatste plaats, met bijbehorende zachte rijachtergronden. Seizoens-awards en Hall of Fame tonen dezelfde emoji's en zachte kolomachtergronden.
+- **F1-29 geslaagd:** lokale en previewbrowseracceptatie geslaagd voor licht standaard, donkere toggle, onthouden keuze, awardemoji's en gekleurde rijen/kolommen. Type E, prioriteit M.
+- **F1-34 preview geslaagd:** op 1440 px staan vier tafels in één rij; de eerste speeldagkaart is 342 px hoog (voor de grid-aanpassing 1215 px). Op 1024 px staan drie tafels per rij; op 900 px en mobiel blijven ze onder elkaar. Geen horizontale overflow op 1440, 1024, 900, 768, 390 of 360 px. Previewcommit `30d631f` / Pages-run `40219277473` slaagde. Type E, prioriteit S.
+
+### Overdracht: gewenste Speeldagen-weergave (2026-10-25)
+
+- Nog niet geïmplementeerd: per tafel vier spelers als verticale lijst, met W-L van die speeldag naast elke naam. Geen afzonderlijke matchups of ruwe scores in Speeldagen; volledige uitslagen blijven in Scores.
+- Volgende implementatie moet de gedeelde W-L-uitkomst hergebruiken, de desktop-grid behouden en tafels op mobiel stapelen. Zie F2-43 t/m F2-45 hieronder; geen codewijziging in deze overdrachtsstap.
+
 ## 1. Legenda
 
 | Code | Betekenis |
@@ -97,6 +133,7 @@ De handberekende verwachte uitkomsten staan naast de fixtures (`tests/expected/`
 | F1-15 | `docs/`-inhoud | Alleen toegestane afgeleide bestanden; geen CSV, backups, rapporten, migratiestatus | S | M |
 | F1-16 | Hoofdapp en tests via re-export-shims | Importeren werken; geen circulaire imports; REG-01 en REG-03 groen | I | M |
 | F1-17 | Geen dubbele rekenlogica | Berekeningen in `manillen_core/`; JavaScript bevat geen klassement- of profielberekening (codecontrole) | S | M |
+| F1-18 | NAS-upload en workflow-invoer | Upload bevat één buildId-gevalideerd JSON-archief; geen bron-CSV's; mislukte upload dispatcht niet | I | M |
 
 ### 4.3 Frontend
 
@@ -107,10 +144,12 @@ De handberekende verwachte uitkomsten staan naast de fixtures (`tests/expected/`
 | F1-22 | Filters seizoen, speeldag en spelerzoek | Resultaat gelijk aan verwachte fixtureuitkomst | E | M |
 | F1-23 | Laadindicator en foutafhandeling | Indicator zichtbaar tijdens laden; vriendelijke melding als een JSON-bestand ontbreekt | E | M |
 | F1-24 | Netwerkverzoeken | Alleen eigen origin; geen externe fonts of scripts | E | M |
-| F1-25 | Cachebusting | Assets en data bevatten `buildId`; nieuwe build geeft nieuwe URL's | E | M |
+| F1-25 | Cachebusting | Data-URL's volgen `buildId`; CSS/JS/HTML-deploywijzigingen krijgen bovendien een assetfingerprint zodat assets bij ongewijzigde snapshotdata ook nieuwe URL's krijgen | E | M |
 | F1-26 | Console | Geen JavaScript-fouten op alle routes | E | M |
 | F1-27 | Tab-inhoud wordt lui geladen | Per tab/seizoen enkel de benodigde JSON opgehaald | E | S |
 | F1-28 | `noindex`-meta | Aanwezig op alle pagina's; er is geen standaard `Disallow: /` in `robots.txt` | S | M |
+| F1-29 | Thema en awardaccenten | Licht is standaard, ook bij OS-dark; toggle schakelt thema en onthoudt keuze; medailles/lantaarn en gekleurde awardrijen/-kolommen blijven zichtbaar in beide thema's | E | M |
+| F1-34 | Speeldagen desktop compacter | Vanaf 901 px is verticale witruimte kleiner; op mobiele breedtes blijven de bestaande afmetingen en geen-overflow-gedrag behouden | E | S |
 
 ### 4.4 Prestaties (budget uit plan; definitief na F0-11)
 
@@ -125,14 +164,14 @@ De handberekende verwachte uitkomsten staan naast de fixtures (`tests/expected/`
 
 | ID | Test | Verwacht | Type | Prio |
 |---|---|---|---|---|
-| F1-40 | Preview-locatie `https://nubrodr.github.io/Manillen-preview/` | Geen registratie van de oude worker onder dat pad; pagina's komen van de nieuwe site | H | M |
+| F1-40 | Preview-locatie `https://nubrodr.github.io/manillen-preview/` | Geen registratie van de oude worker onder dat pad; pagina's komen van de nieuwe site | H | M |
 | F1-41 | Repetitie van de cutover op het previewproject | Oude Shinylive-export in preview bezocht met testprofiel; daarna nieuwe site met opruimscript; na één bezoek toont het profiel de nieuwe site en is de oude worker uitgeschreven | H | M |
 | F1-42 | Opruimscript op het pad van de oude worker | Schrijft worker en caches uit; geen fouten in console | E | M |
 | F1-43 | Publieke URL | `https://nubrodr.github.io/Manillen/` blijft werken | H | M |
 | F1-44 | Rollback | Terugzetten van vorige `docs/`-commit herstelt een werkende site | H | M |
 | F1-45 | Workflow `publish-mirror.yml` | Geen Shinylive-installatie; duur korter dan baseline | H | S |
 | F1-46 | Live cutover | Zelfde controle als F1-41 op de echte URL met een profiel dat de oude site eerder bezocht | H | M |
-| F1-47 | Basepad-onafhankelijkheid | Dezelfde build werkt onder `/`, `/Manillen/` en `/Manillen-preview/` (relatieve URL's, geen 404's) | E | M |
+| F1-47 | Basepad-onafhankelijkheid | Dezelfde build werkt onder `/`, `/Manillen/` en `/manillen-preview/` (relatieve URL's, geen 404's) | E | M |
 
 ## 5. Fase 2: Speeldagen-rangschikking en scorevalidatie
 
@@ -182,6 +221,9 @@ De handberekende verwachte uitkomsten staan naast de fixtures (`tests/expected/`
 | F2-40 | Formaat | Naam gevolgd door W-L, bv. `3-0`; geen saldo zichtbaar | E | M |
 | F2-41 | Winst/verlies niet alleen door kleur | Tekst aanwezig | E | M |
 | F2-42 | Weergave op 360 px | Geen horizontaal scrollen in de tafelkaart | E | M |
+| F2-43 | Speeldagen per tafel | Vier spelers staan elk op een eigen verticale rij; het W-L-resultaat van de speeldag staat naast de juiste naam | E | M |
+| F2-44 | Scheiding Speeldagen en Scores | Speeldagen toont geen spel-per-spel-matchups of ruwe scores; Scores blijft alle volledige matchups en scores tonen | E | M |
+| F2-45 | Responsieve tafelkaarten | Desktop behoudt auto-grid; op mobiel staan tafels onder elkaar; geen pagina-overflow op 360, 390, 768, 1024 en 1440 px | E | S |
 
 ## 6. Fase 3: ID-registry en migratie
 

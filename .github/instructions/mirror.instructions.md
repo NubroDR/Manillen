@@ -9,8 +9,8 @@ applyTo:
 
 # Public mirror guidance
 
-- `mirror_app/` is a read-only public view; it must not modify its snapshot CSVs or provide write actions.
-- The mirror consumes the checked-in snapshot in `mirror_app/data/`, not live NAS data. Update snapshots from the repository-root `data/` through `publish_mirror.py`.
-- `publish_mirror.py` creates the Shinylive export in `docs/`. Change the source app or export script, then regenerate; do not hand-edit generated runtime files in `docs/`.
-- Keep mirror code and dependencies compatible with the Shinylive/Pyodide export. Prefer the existing pure helper modules and avoid adding dependencies without verifying export support.
-- The Pages deployment and mirror publication are separate workflows. Preserve their existing trigger and permission boundaries when changing either flow.
+- `mirror_app/` remains the current read-only Shinylive site until the static replacement passes preview, service-worker, rollback, and cutover acceptance. It must not modify its snapshot CSVs or provide write actions.
+- The new public mirror uses `site/`, `manillen_core/`, and derived JSON generated from a datastore. `github_publish.py` uploads one JSON-only `static_snapshot.zip`; never upload source CSVs, backups, or private reports through this path.
+- `publish_mirror.py` assembles either a local datastore snapshot or the uploaded archive into a new, empty output directory. The Pages workflow uses the archive and writes only generated site assets and JSON to `docs/`.
+- `docs/` is generated output. Change the source or build scripts, then regenerate through the workflow; do not hand-edit generated runtime files in `docs/`.
+- Keep the Pages deployment and mirror publication as separate workflows. Preserve their existing target URL and permission boundaries; do not run a live publish or cutover without explicit approval.

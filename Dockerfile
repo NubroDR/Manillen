@@ -8,7 +8,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py data_paths.py manillen_functions.py score_functions.py reserve_assignments.py github_publish.py ./
+COPY app.py data_paths.py manillen_functions.py score_functions.py reserve_assignments.py github_publish.py generate_static_snapshot.py ./
+COPY manillen_core/ ./manillen_core/
 COPY mirror_app/__init__.py mirror_app/data_helpers.py mirror_app/score_helpers.py mirror_app/season_helpers.py ./mirror_app/
 COPY www/ ./www/
 COPY data/ ./data-seed/

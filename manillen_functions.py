@@ -10,7 +10,7 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 
 from data_paths import DATA_DIR
-from mirror_app.season_helpers import DEFAULT_SEASON, migrate_pairing_history
+from manillen_core.season_helpers import DEFAULT_SEASON, migrate_pairing_history
 
 RESERVE_FILL = PatternFill(fill_type='solid', fgColor='FFF0CF')
 RESERVE_TEXT_COLOR = '806B1D'

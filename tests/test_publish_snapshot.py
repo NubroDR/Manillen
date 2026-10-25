@@ -1,15 +1,15 @@
-from github_publish import SNAPSHOT_FILES as NAS_SNAPSHOT_FILES
-from publish_mirror import SNAPSHOT_FILES as PAGES_SNAPSHOT_FILES
+from pathlib import Path
+
+from github_publish import SNAPSHOT_ARCHIVE
 
 
-def test_season_sources_are_published_but_test_fixture_is_not():
-    expected_sources = {
-        "seasons.csv",
-        "seasons_history.csv",
-        "seasons_playdays_legacy.csv",
-    }
+def test_publisher_transfers_one_derived_snapshot_archive():
+    assert SNAPSHOT_ARCHIVE == "static_snapshot.zip"
 
-    assert expected_sources.issubset(NAS_SNAPSHOT_FILES)
-    assert expected_sources.issubset(PAGES_SNAPSHOT_FILES)
-    assert "hall_of_fame_check.csv" not in NAS_SNAPSHOT_FILES
-    assert "hall_of_fame_check.csv" not in PAGES_SNAPSHOT_FILES
+
+def test_docker_image_includes_the_generator_imports_used_by_publisher():
+    dockerfile = Path(__file__).resolve().parents[1] / "Dockerfile"
+    contents = dockerfile.read_text(encoding="utf-8")
+
+    assert "github_publish.py generate_static_snapshot.py ./" in contents
+    assert "COPY manillen_core/ ./manillen_core/" in contents

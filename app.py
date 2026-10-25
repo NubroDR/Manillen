@@ -22,13 +22,13 @@ from score_functions import (
     load_scores,
     save_game_scores,
 )
-from mirror_app.data_helpers import (
+from manillen_core.data_helpers import (
     load_pairing_counts,
     load_pairing_history,
     load_pairing_locations,
     load_pairing_records,
 )
-from mirror_app.season_helpers import (
+from manillen_core.season_helpers import (
     DEFAULT_SEASON,
     MIN_GAMES_FOR_AWARD,
     append_season_and_close_current,
