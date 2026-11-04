@@ -43,6 +43,17 @@ def _standings_rows(rows):
     ]
 
 
+def _table_standings_rows(rows):
+    return [
+        {
+            "player": row["player"].removesuffix("*"),
+            "wins": row["wins"],
+            "losses": row["games_played"] - row["wins"],
+        }
+        for row in rows
+    ]
+
+
 def _resolved_team_players(value, assignments):
     names = [name.strip() for name in value.split("|") if name.strip()]
     return " | ".join(
@@ -78,9 +89,6 @@ def _season_snapshot(
             key=lambda row: row["Table"],
         )
         date_assignments = assignments.get(play_date, {})
-        day_scores = [
-            row for row in all_scores if row["Date"] == play_date
-        ]
         tables = []
         for record in table_records:
             players = [
@@ -89,31 +97,19 @@ def _season_snapshot(
                 else player
                 for player in record["Players"]
             ]
-            table_scores = sorted(
-                (
-                    {
-                        "game": row["Game"],
-                        "team1Players": _resolved_team_players(
-                            row["Team1Players"],
-                            date_assignments,
-                        ),
-                        "team2Players": _resolved_team_players(
-                            row["Team2Players"],
-                            date_assignments,
-                        ),
-                        "team1Score": row["Team1Score"],
-                        "team2Score": row["Team2Score"],
-                    }
-                    for row in day_scores
-                    if row["Table"] == record["Table"]
-                ),
-                key=lambda row: row["game"],
+            table_standings = compute_standings(
+                str(scores_path),
+                play_date=play_date,
+                season=season,
+                history_filename=str(history_path),
+                reserve_assignments_filename=str(assignments_path),
+                table_number=record["Table"],
             )
             tables.append({
                 "table": record["Table"],
                 "players": players,
                 "location": record["Location"],
-                "scores": table_scores,
+                "standings": _table_standings_rows(table_standings),
             })
         location = next(
             (record["Location"] for record in table_records if record["Location"]),

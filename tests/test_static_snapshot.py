@@ -265,6 +265,50 @@ def test_snapshot_season_standings_and_playday_match_shared_helpers(tmp_path):
     assert current["playdays"][0]["tables"][0]["players"][-1] == "Freddy"
 
 
+def test_playday_table_standings_are_scoped_and_scores_stay_in_scores_view(tmp_path):
+    data_dir = tmp_path / "data"
+    make_snapshot_fixture(data_dir)
+    history_path = data_dir / "pairings_history.csv"
+    with history_path.open("a", encoding="utf-8", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow([
+            "2025-10-04", "2", "An | Bruno | Etienne | Freddy",
+            "2025-2026", "Gent",
+        ])
+    scores_path = data_dir / "scores_history.csv"
+    with scores_path.open("a", encoding="utf-8", newline="") as file:
+        writer = csv.writer(file)
+        for game, team1, team2 in (
+            (1, "An | Bruno", "Etienne | Freddy"),
+            (2, "An | Etienne", "Bruno | Freddy"),
+            (3, "An | Freddy", "Bruno | Etienne"),
+        ):
+            writer.writerow([
+                "2025-10-04", "2", game, team1, team2, "20", "101",
+            ])
+
+    _, files = build_snapshot(data_dir)
+    day = next(
+        day
+        for day in files["seasons/2025-2026.json"]["playdays"]
+        if day["date"] == "2025-10-04"
+    )
+    tables = {table["table"]: table for table in day["tables"]}
+    table_one = {
+        row["player"]: (row["wins"], row["losses"])
+        for row in tables[1]["standings"]
+    }
+    table_two = {
+        row["player"]: (row["wins"], row["losses"])
+        for row in tables[2]["standings"]
+    }
+
+    assert table_one["An"] == (2, 1)
+    assert table_two["An"] == (0, 3)
+    assert all("scores" not in table for table in tables.values())
+    assert len(files["seasons/2025-2026.json"]["scores"]) == 6
+
+
 def test_snapshot_pairings_and_legacy_shared_bronze_match_helpers(tmp_path):
     data_dir = tmp_path / "data"
     make_snapshot_fixture(data_dir)
@@ -359,13 +403,12 @@ def test_snapshot_is_deterministic_json_only_and_never_changes_source(tmp_path):
             }
             assert all(set(row) == standings_keys for row in day["standings"])
             for table in day["tables"]:
-                assert set(table) == {"table", "players", "location", "scores"}
+                assert set(table) == {
+                    "table", "players", "location", "standings",
+                }
                 assert all(
-                    set(row) == {
-                        "game", "team1Players", "team2Players",
-                        "team1Score", "team2Score",
-                    }
-                    for row in table["scores"]
+                    set(row) == {"player", "wins", "losses"}
+                    for row in table["standings"]
                 )
         assert all(
             set(row) == {"date", "location", "playersPresent"}

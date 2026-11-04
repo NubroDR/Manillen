@@ -437,42 +437,36 @@ select:focus-visible {
 }
 
 .player-list {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: 8px;
-  margin: 0 0 12px;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.player-chip {
-  display: inline-flex;
-  min-height: 36px;
+.player-result-row {
+  display: flex;
+  min-width: 0;
+  min-height: 40px;
   align-items: center;
-  padding: 5px 10px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: 8px;
   background: var(--surface);
   font-size: 0.88rem;
 }
 
-.match-list {
-  display: grid;
-  gap: 8px;
+.player-result-name {
+  overflow-wrap: anywhere;
 }
 
-.match-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.match-row strong {
-  color: var(--ink);
+.player-result-record {
+  min-width: 3.25em;
+  font-weight: 750;
   font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .site-footer {
@@ -504,22 +498,6 @@ select:focus-visible {
 
   .player-list {
     gap: 6px;
-    margin-bottom: 8px;
-  }
-
-  .player-chip {
-    min-height: 32px;
-    padding: 4px 9px;
-  }
-
-  .match-list {
-    gap: 4px;
-  }
-
-  .match-row {
-    gap: 6px;
-    margin: 0;
-    line-height: 1.35;
   }
 }
 

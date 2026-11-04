@@ -4,7 +4,7 @@ Een Shiny for Python-app om 2v2-manillen-tafels te organiseren voor een familie-
 
 ## Projectstatus
 
-Deze repository is de actuele basis voor de volledige NAS-applicatie en de read-only GitHub Pages-app. De schrijfbare hoofdapp staat in `app.py`; de productie-URL <https://nubrodr.github.io/Manillen/> gebruikt nog de bestaande Shinylive-app uit `mirror_app/`. De nieuwe statische mirror staat alleen op de aparte preview <https://nubrodr.github.io/manillen-preview/>; de laatste previewdeploy is commit `30d631f` (Pages-run `40219277473`). Daar is de desktop-grid voor Speeldagen gecontroleerd; een compactere weergave met verticale spelersrijen en W-L naast elke speler staat nog open. De oude Shinylive-worker is op het previewpad opgeruimd en de rollback/startup is in de preview gerepeteerd en gevalideerd (F1-44). Productie-`docs/` is niet aangepast en er is geen productiecutover uitgevoerd. Zie [het implementatieplan](./plans/IMPLEMENTATIEPLAN_PROFIELEN_IDS_MOBIEL_v3.md) en [het testplan](./plans/TESTPLAN_ACCEPTATIE_v3.md) voor de overdracht, open acceptatie en eerstvolgende taak.
+Deze repository is de actuele basis voor de volledige NAS-applicatie en de read-only GitHub Pages-app. De schrijfbare hoofdapp staat in `app.py`; de productie-URL <https://nubrodr.github.io/Manillen/> gebruikt nog de bestaande Shinylive-app uit `mirror_app/`. De nieuwe statische mirror staat alleen op de aparte preview <https://nubrodr.github.io/manillen-preview/>; de laatste previewdeploy is commit `30d631f` (Pages-run `40219277473`). De desktop-grid voor Speeldagen is daar gecontroleerd; de lokale bron toont nu per tafel verticale spelersrijen met W-L, maar deze wijziging is nog niet op de preview uitgerold. De oude Shinylive-worker is op het previewpad opgeruimd en de rollback/startup is in de preview gerepeteerd en gevalideerd (F1-44). Productie-`docs/` is niet aangepast en er is geen productiecutover uitgevoerd. Zie [het implementatieplan](./plans/IMPLEMENTATIEPLAN_PROFIELEN_IDS_MOBIEL_v3.md) en [het testplan](./plans/TESTPLAN_ACCEPTATIE_v3.md) voor de overdracht, open acceptatie en eerstvolgende taak.
 
 ## LLM-context en wijzigingsbasis
 
@@ -31,6 +31,7 @@ Kortom: als een wijziging "groot" is, dan is een README-update verplicht. Als ee
 - Spelers selecteren met een typeahead-selector.
 - Automatisch tafels van vier spelers indelen met zo weinig mogelijk herhaalde partners.
 - Indelingen bewaren en eerdere speeldagen bekijken of verwijderen.
+- Speeldagen tonen spelers per tafel met hun W-L-resultaat; de volledige matchups en scores staan apart in Scores.
 - Excel-scorebladen genereren vanuit een opgeslagen speeldag, met alleen het benodigde aantal reservevelden.
 - Reservenamen per speeldag opslaan en automatisch opnieuw laden; reserves krijgen een afwijkende Excel-stijl.
 - Scores voor de drie 2v2-spellen per tafel invoeren.
@@ -128,6 +129,8 @@ python -m http.server --directory "<previewmap>" 8000
 ```
 
 `github_publish.py` genereert op de NAS een afgeleide JSON-snapshot en uploadt die als één `static_snapshot.zip`; de bron-CSV's worden niet door deze nieuwe knopstroom geüpload. De handmatige `publish-mirror.yml`-workflow assembleert het archief met `publish_mirror.py` naar `docs/`, zonder Shinylive-installatie. Deze hoofdrepo-workflow is voorbereid maar nog niet uitgevoerd. Preview-, service-worker- en rollbackacceptatie zijn op de aparte preview afgerond; de productie blijft de huidige Shinylive-export tot de resterende productieacceptatie en cutover expliciet zijn goedgekeurd.
+
+In de statische mirror bevat Speeldagen per tafel een verticale lijst met spelers en hun gewonnen-verlorenresultaat. Gedetailleerde matchups en ruwe scores worden alleen op Scores getoond.
 
 ## Tafelindeling en scores
 

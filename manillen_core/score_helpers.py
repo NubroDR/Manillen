@@ -55,9 +55,12 @@ def compute_standings(
     season=None,
     history_filename=None,
     reserve_assignments_filename=None,
+    table_number=None,
 ):
     selected_date = _score_date(play_date) if play_date is not None else None
     scores = load_scores(scores_filename, selected_date)
+    if table_number is not None:
+        scores = [row for row in scores if row["Table"] == table_number]
     if season is not None:
         if history_filename is None:
             raise ValueError("history_filename is required when filtering by season")

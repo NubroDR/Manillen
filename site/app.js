@@ -315,25 +315,22 @@ function playdaysView(data, route, params) {
       const tableCard = element("section", undefined, "table-card");
       tableCard.append(element("h3", `Tafel ${tableData.table}`));
       const names = element("ul", undefined, "player-list");
+      names.setAttribute("aria-label", "W-L-resultaten per speler");
+      const standingsByPlayer = new Map(
+        tableData.standings.map((standing) => [standing.player, standing]),
+      );
       for (const player of tableData.players) {
-        names.append(element("li", player, "player-chip"));
+        const standing = standingsByPlayer.get(player);
+        const wins = standing?.wins ?? 0;
+        const losses = standing?.losses ?? 0;
+        const row = element("li", undefined, "player-result-row");
+        row.append(element("span", player, "player-result-name"));
+        const result = element("strong", `${wins}-${losses}`, "player-result-record");
+        result.setAttribute("aria-label", `${wins} gewonnen, ${losses} verloren`);
+        row.append(result);
+        names.append(row);
       }
       tableCard.append(names);
-      if (tableData.scores.length) {
-        const matches = element("div", undefined, "match-list");
-        for (const score of tableData.scores) {
-          const match = element("p", undefined, "match-row");
-          match.append(
-            element("span", score.team1Players.replaceAll("|", " + ")),
-            element("strong", `${score.team1Score} – ${score.team2Score}`),
-            element("span", score.team2Players.replaceAll("|", " + ")),
-          );
-          matches.append(match);
-        }
-        tableCard.append(matches);
-      } else {
-        tableCard.append(element("p", "Nog geen scores ingevoerd.", "subtle-note"));
-      }
       card.append(tableCard);
     }
     fragment.append(card);

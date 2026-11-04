@@ -1,16 +1,16 @@
 # Implementatieplan v3: snelle statische mirror, Speeldagen, ID's en spelersprofielen
 
-**Status:** implementatie gestart — Fase 0 en Fase 1 niet volledig afgerond; statische preview live; Fase 2-weergave nog open
+**Status:** implementatie gestart — Fase 0 en Fase 1 niet volledig afgerond; statische preview live; Speeldagen-W-L-weergave lokaal geïmplementeerd, previewacceptatie open
 **Scope:** publieke read-only mirror (herbouw als statische site), gedeelde berekeningen, centrale referentiedata, Speeldagen-rangschikking, spelersprofielen en mobile-first ontwerp.  
 **Belangrijke randvoorwaarde:** bestaande gebruikersdata in `data/` blijft onaangeroerd totdat een migratie expliciet is goedgekeurd, geback-upt en geverifieerd.
 
 ### Overdracht voor volgende sessie (2026-10-25)
 
-- **Eerstvolgende taak:** werk de Speeldagen-weergave volgens onderstaande gebruikerswens af; deze is bewust nog niet geïmplementeerd. Toon per speeldag de tafelkaarten met de vier spelers als verticale lijst en per speler diens W-L-resultaat van die dag. Toon hier geen losse matchups of ruwe scores; de volledige speluitslagen blijven op het tabblad Scores. Behoud de desktop-grid en mobiele stapeling; gebruik de gedeelde berekening, geen tweede JavaScript-scorelogica.
+- **Speeldagen-weergave lokaal afgerond (2026-11-04):** per tafel staan de spelers verticaal met hun W-L-resultaat; de gedeelde `compute_standings`-berekening levert de tabelspecifieke waarden. Speeldagen bevat geen matchups of ruwe scores meer; de detailuitslagen blijven op Scores. De desktop-grid en mobiele stapeling zijn lokaal in de browser gecontroleerd; de aangepaste build is nog niet op de preview uitgerold.
 - De desktop-grid staat al live in de aparte preview: commit `30d631f` / Pages-run `40219277473`. Vier tafels naast elkaar op 1440 px, drie op 1024 px; op 900 px en smaller gestapeld. Productie-URL `/Manillen/` en hoofdrepo-`docs/` zijn niet aangepast.
 - De previewwijziging is door browsercontrole bevestigd op 1440, 1024, 900, 768, 390 en 360 px zonder horizontale overflow. `.venv\Scripts\python.exe -m pytest tests\test_static_snapshot.py` slaagde: 12 passed.
 - De hoofdwerkboom bevat veel al bestaande wijzigingen uit de implementatie. Controleer `git status` bij hervatten; behoud deze wijzigingen en commit niet de volledige werkboom als onderdeel van een kleine vervolgtaak. De previewwijziging is apart gecommit in `NubroDR/manillen-preview`; root-code en plannen staan lokaal gewijzigd/ongetrackt.
-- **Daarna nog open:** Fase 0 Lighthouse/Slow-4G-meting en budget; resterende Fase 1-acceptatie en uiteindelijke productie-`docs/`-controle; expliciete productiecutovergoedkeuring (F1-46); daarna ID-migratie, ID-gebaseerde schrijfstromen en spelersprofielen (Fase 3–5). Geen migratie toepassen op de echte `data/` zonder goedgekeurde mapping, backup en aparte toestemming.
+- **Daarna nog open:** previewacceptatie van deze wijziging; overige Fase 2-acceptatie; Fase 0 Lighthouse/Slow-4G-meting en budget; resterende Fase 1-acceptatie en uiteindelijke productie-`docs/`-controle; expliciete productiecutovergoedkeuring (F1-46); daarna ID-migratie, ID-gebaseerde schrijfstromen en spelersprofielen (Fase 3–5). Geen migratie toepassen op de echte `data/` zonder goedgekeurde mapping, backup en aparte toestemming.
 
 ### Voortgang Fase 0 (2026-10-25)
 

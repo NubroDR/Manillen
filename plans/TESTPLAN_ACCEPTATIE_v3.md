@@ -37,8 +37,14 @@
 
 ### Overdracht: gewenste Speeldagen-weergave (2026-10-25)
 
-- Nog niet geïmplementeerd: per tafel vier spelers als verticale lijst, met W-L van die speeldag naast elke naam. Geen afzonderlijke matchups of ruwe scores in Speeldagen; volledige uitslagen blijven in Scores.
-- Volgende implementatie moet de gedeelde W-L-uitkomst hergebruiken, de desktop-grid behouden en tafels op mobiel stapelen. Zie F2-43 t/m F2-45 hieronder; geen codewijziging in deze overdrachtsstap.
+- Destijds nog niet geïmplementeerd: per tafel vier spelers als verticale lijst, met W-L van die speeldag naast elke naam. Geen afzonderlijke matchups of ruwe scores in Speeldagen; volledige uitslagen blijven in Scores.
+- De implementatie en lokale browsercontrole zijn op 2026-11-04 uitgevoerd; zie de voortgangsnotitie hieronder. Previewacceptatie blijft open.
+
+### Voortgang Speeldagen-W-L-weergave (2026-11-04)
+
+- De snapshotgenerator publiceert per tafel de W-L-resultaten uit de gedeelde scoreberekening. Ruwe matchups en scores staan niet langer dubbel in de `playdays[].tables[]`-gegevens; de afzonderlijke `scores`-lijst blijft volledig.
+- Lokale browsercontrole op een geïsoleerde fixture: vier verticale spelersrijen met W-L, geen matchups/scores in Speeldagen, en detailmatchup plus ruwe scores zichtbaar op Scores. Geen pagina-overflow op 360, 375, 390, 768, 1024 en 1440 px; mobiel stapelt de tafels en desktop toont de bestaande auto-grid. De browser heeft fixture-JSON gebruikt; er is niet gepubliceerd naar de preview.
+- Validatie: `tests/test_static_snapshot.py` geslaagd (`13 passed`) en de volledige regressiesuite geslaagd (`53 passed`). F2-43 t/m F2-45 zijn lokaal geverifieerd; de overige Fase 2-tests blijven open.
 
 ## 1. Legenda
 
