@@ -1071,7 +1071,16 @@ def server(input: Inputs, output: Outputs, session: Session):
             for game in range(1, 4):
                 team1 = getattr(input, _score_input_id(table, game, "team1"))()
                 team2 = getattr(input, _score_input_id(table, game, "team2"))()
-                if team1 is not None and team2 is not None and team1 < 101 and team2 < 101:
+                if team1 is not None and team2 is not None and team1 == team2:
+                    warnings.append(
+                        f"Tafel {table}, spel {game}: gelijke scores zijn niet toegestaan."
+                    )
+                elif (
+                    team1 is not None
+                    and team2 is not None
+                    and team1 < 101
+                    and team2 < 101
+                ):
                     warnings.append(f"Tafel {table}, spel {game}: geen van beide scores is 101 of hoger.")
         if not warnings:
             return ui.HTML("")
@@ -1106,6 +1115,12 @@ def server(input: Inputs, output: Outputs, session: Session):
                     score_message.set((
                         "error",
                         f"Tafel {table}, spel {game}: scores moeten niet-negatieve gehele getallen zijn.",
+                    ))
+                    return
+                if team1_score == team2_score:
+                    score_message.set((
+                        "error",
+                        f"Tafel {table}, spel {game}: gelijke scores zijn niet toegestaan.",
                     ))
                     return
                 complete_games.append({

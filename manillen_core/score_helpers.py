@@ -13,6 +13,10 @@ except ImportError:
 DEFAULT_SCORES_FILE = Path(__file__).resolve().parent / "data" / "scores_history.csv"
 
 
+def is_valid_game_score(team1_score, team2_score):
+    return team1_score != team2_score
+
+
 def _score_date(play_date):
     if play_date is None:
         return date.today().isoformat()
@@ -77,6 +81,8 @@ def compute_standings(
 
     standings = defaultdict(lambda: {"games_played": 0, "wins": 0, "points_for": 0, "points_against": 0})
     for row in scores:
+        if not is_valid_game_score(row["Team1Score"], row["Team2Score"]):
+            continue
         team1 = [name.strip() for name in row["Team1Players"].split("|") if name.strip()]
         team2 = [name.strip() for name in row["Team2Players"].split("|") if name.strip()]
         if len(team1) != 2 or len(team2) != 2:

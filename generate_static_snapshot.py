@@ -14,7 +14,11 @@ from manillen_core.data_helpers import (
     load_pairing_records,
     load_reserve_assignments,
 )
-from manillen_core.score_helpers import compute_standings, load_scores
+from manillen_core.score_helpers import (
+    compute_standings,
+    is_valid_game_score,
+    load_scores,
+)
 from manillen_core.season_helpers import (
     MIN_GAMES_FOR_AWARD,
     compute_closed_season_awards,
@@ -46,14 +50,19 @@ def _standings_rows(rows):
 def _table_standings_rows(rows, players):
     results = {
         row["player"].removesuffix("*"): {
-            "player": row["player"].removesuffix("*"),
             "wins": row["wins"],
             "losses": row["games_played"] - row["wins"],
         }
         for row in rows
     }
     standings = [
-        results.get(player, {"player": player, "wins": 0, "losses": 0})
+        {
+            "player": player,
+            **results.get(
+                player.removesuffix("*"),
+                {"wins": 0, "losses": 0},
+            ),
+        }
         for player in players
     ]
     return sorted(
@@ -61,7 +70,7 @@ def _table_standings_rows(rows, players):
         key=lambda row: (
             -row["wins"],
             -(row["wins"] + row["losses"]),
-            row["player"].casefold(),
+            row["player"].removesuffix("*").casefold(),
         ),
     )
 
@@ -104,7 +113,7 @@ def _season_snapshot(
         tables = []
         for record in table_records:
             players = [
-                date_assignments.get(player, player)
+                f"{date_assignments.get(player, player)}*"
                 if player.casefold().startswith("reserve ")
                 else player
                 for player in record["Players"]
@@ -161,6 +170,9 @@ def _season_snapshot(
             ),
             "team1Score": row["Team1Score"],
             "team2Score": row["Team2Score"],
+            "validScore": is_valid_game_score(
+                row["Team1Score"], row["Team2Score"],
+            ),
         }
         for row in all_scores
         if row["Date"] in season_dates

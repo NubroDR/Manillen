@@ -225,6 +225,7 @@ def test_snapshot_season_standings_and_playday_match_shared_helpers(tmp_path):
             ),
             "team1Score": row["Team1Score"],
             "team2Score": row["Team2Score"],
+            "validScore": int(row["Team1Score"]) != int(row["Team2Score"]),
         }
         for row in load_scores(scores_path, "2025-10-04")
     ]
@@ -262,7 +263,7 @@ def test_snapshot_season_standings_and_playday_match_shared_helpers(tmp_path):
         for row in old_day["standings"]
     ] == normalize(old_day_standings)
     assert season["scores"] == expected_scores
-    assert current["playdays"][0]["tables"][0]["players"][-1] == "Freddy"
+    assert current["playdays"][0]["tables"][0]["players"][-1] == "Freddy*"
 
 
 def test_playday_table_standings_are_scoped_and_scores_stay_in_scores_view(tmp_path):
@@ -310,6 +311,52 @@ def test_playday_table_standings_are_scoped_and_scores_stay_in_scores_view(tmp_p
     ]
     assert all("scores" not in table for table in tables.values())
     assert len(files["seasons/2025-2026.json"]["scores"]) == 6
+
+
+def test_playday_reserve_names_have_asterisk_for_assigned_players(tmp_path):
+    data_dir = tmp_path / "data"
+    make_snapshot_fixture(data_dir)
+
+    _, files = build_snapshot(data_dir)
+    day = next(
+        day
+        for day in files["seasons/2026-2027.json"]["playdays"]
+        if day["date"] == "2026-05-16"
+    )
+    table = day["tables"][0]
+
+    assert "Freddy*" in table["players"]
+    assert any(row["player"] == "Freddy*" for row in table["standings"])
+
+
+def test_historical_equal_scores_are_marked_invalid_and_not_counted(tmp_path):
+    data_dir = tmp_path / "data"
+    make_snapshot_fixture(data_dir)
+    scores_path = data_dir / "scores_history.csv"
+    with scores_path.open(encoding="utf-8", newline="") as file:
+        rows = list(csv.DictReader(file))
+    tied_row = next(row for row in rows if row["Date"] == "2025-10-04" and row["Game"] == "2")
+    tied_row["Team1Score"] = tied_row["Team2Score"] = "75"
+    write_csv(scores_path, list(rows[0]), rows)
+    before = scores_path.read_bytes()
+
+    _, files = build_snapshot(data_dir)
+    season = files["seasons/2025-2026.json"]
+    tied_score = next(
+        row for row in season["scores"]
+        if row["date"] == "2025-10-04" and row["game"] == 2
+    )
+    day = next(day for day in season["playdays"] if day["date"] == "2025-10-04")
+    standings = {row["player"]: row for row in day["tables"][0]["standings"]}
+
+    assert tied_score["validScore"] is False
+    assert {player: row["wins"] for player, row in standings.items()} == {
+        "An": 2, "Bruno": 1, "Etienne": 0, "Freddy": 1,
+    }
+    assert {player: row["losses"] for player, row in standings.items()} == {
+        "An": 0, "Bruno": 1, "Etienne": 2, "Freddy": 1,
+    }
+    assert scores_path.read_bytes() == before
 
 
 def test_snapshot_pairings_and_legacy_shared_bronze_match_helpers(tmp_path):
@@ -392,7 +439,7 @@ def test_snapshot_is_deterministic_json_only_and_never_changes_source(tmp_path):
     }
     score_keys = {
         "date", "table", "game", "team1Players", "team2Players",
-        "team1Score", "team2Score",
+        "team1Score", "team2Score", "validScore",
     }
     for path, payload in first_files.items():
         if not path.startswith("seasons/"):

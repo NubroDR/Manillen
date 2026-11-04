@@ -2,7 +2,7 @@ import csv
 
 import pytest
 
-from score_functions import save_game_score, save_game_scores
+from score_functions import compute_standings, save_game_score, save_game_scores, save_scores
 
 
 HEADER = [
@@ -77,6 +77,69 @@ def test_batch_game_save_validates_every_game_before_writing(tmp_path):
         save_game_scores("2026-09-19", [valid_game, invalid_game], path)
 
     assert not path.exists()
+
+
+def test_equal_scores_are_rejected_without_changing_existing_scores(tmp_path):
+    path = tmp_path / "scores.csv"
+    save_game_score(
+        "2026-09-19", 1, 1, ["An", "Bruno"], ["Etienne", "Freddy"], 101, 20, path,
+    )
+    before = path.read_bytes()
+
+    with pytest.raises(ValueError, match="scores must not be equal"):
+        save_game_score(
+            "2026-09-19", 1, 1, ["An", "Bruno"], ["Etienne", "Freddy"], 80, 80, path,
+        )
+
+    assert path.read_bytes() == before
+
+
+def test_save_scores_rejects_equal_scores_before_replacing_table(tmp_path):
+    path = tmp_path / "scores.csv"
+    save_game_score(
+        "2026-09-19", 1, 1, ["An", "Bruno"], ["Etienne", "Freddy"], 101, 20, path,
+    )
+    before = path.read_bytes()
+
+    with pytest.raises(ValueError, match="scores must not be equal"):
+        save_scores("2026-09-19", 1, [
+            {
+                "team1": ["An", "Bruno"], "team2": ["Etienne", "Freddy"],
+                "team1_score": 101, "team2_score": 20,
+            },
+            {
+                "team1": ["An", "Etienne"], "team2": ["Bruno", "Freddy"],
+                "team1_score": 75, "team2_score": 75,
+            },
+            {
+                "team1": ["An", "Freddy"], "team2": ["Bruno", "Etienne"],
+                "team1_score": 80, "team2_score": 101,
+            },
+        ], path)
+
+    assert path.read_bytes() == before
+
+
+def test_historical_equal_scores_are_excluded_from_standings_without_modification(tmp_path):
+    path = tmp_path / "scores.csv"
+    path.write_text(
+        ",".join(HEADER) + "\n"
+        "2026-09-19,1,1,An | Bruno,Etienne | Freddy,80,80\n"
+        "2026-09-19,1,2,An | Etienne,Bruno | Freddy,101,20\n",
+        encoding="utf-8",
+    )
+    before = path.read_bytes()
+
+    standings = compute_standings(path, play_date="2026-09-19")
+    by_player = {row["player"]: row for row in standings}
+
+    assert {player: row["games_played"] for player, row in by_player.items()} == {
+        "An": 1, "Bruno": 1, "Etienne": 1, "Freddy": 1,
+    }
+    assert {player: row["wins"] for player, row in by_player.items()} == {
+        "An": 1, "Bruno": 0, "Etienne": 1, "Freddy": 0,
+    }
+    assert path.read_bytes() == before
 
 
 @pytest.mark.parametrize(

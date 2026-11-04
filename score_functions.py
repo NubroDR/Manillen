@@ -5,6 +5,7 @@ from pathlib import Path
 from data_paths import DATA_DIR
 from manillen_core.score_helpers import (
     compute_standings as _compute_standings,
+    is_valid_game_score,
     load_scores as _load_scores,
 )
 
@@ -103,6 +104,8 @@ def save_scores(play_date, table, game_scores, scores_filename=str(DATA_DIR / "s
             raise ValueError("each game score must be a dictionary")
         team1_score = _score_value(score.get("team1_score"))
         team2_score = _score_value(score.get("team2_score"))
+        if not is_valid_game_score(team1_score, team2_score):
+            raise ValueError("scores must not be equal")
         if not score.get("team1") or not score.get("team2"):
             raise ValueError("each game must contain both teams")
         new_rows.append({
@@ -168,14 +171,18 @@ def save_game_scores(
         if key in replaced_games:
             raise ValueError("game_scores cannot contain duplicate games")
         replaced_games.add(key)
+        team1_score = _score_value(score.get("team1_score"))
+        team2_score = _score_value(score.get("team2_score"))
+        if not is_valid_game_score(team1_score, team2_score):
+            raise ValueError("scores must not be equal")
         new_rows.append({
             "Date": play_date,
             "Table": str(table_number),
             "Game": str(game_number),
             "Team1Players": _team_value(score["team1"]),
             "Team2Players": _team_value(score["team2"]),
-            "Team1Score": str(_score_value(score.get("team1_score"))),
-            "Team2Score": str(_score_value(score.get("team2_score"))),
+            "Team1Score": str(team1_score),
+            "Team2Score": str(team2_score),
         })
 
     path = Path(scores_filename)

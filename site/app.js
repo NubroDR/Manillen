@@ -376,14 +376,27 @@ function scoresTable(data, selectedDate, playerQuery) {
   return table(
     ["Datum", "Tafel", "Spel", "Team 1", "Score", "Team 2", "Score"],
     rows.map((row) => {
-      const team1Won = row.team1Score > row.team2Score;
+      const team1Won = row.validScore && row.team1Score > row.team2Score;
+      const team2Won = row.validScore && row.team2Score > row.team1Score;
       return [
         cell("Datum", row.date),
         cell("Tafel", row.table, "numeric"),
-        cell("Spel", row.game, "numeric"),
-        cell("Team 1", row.team1Players.replaceAll("|", " + "), team1Won ? "score-winner" : "score-loser"),
+        cell(
+          "Spel",
+          row.validScore ? row.game : `${row.game} — ongeldig: gelijke score`,
+          row.validScore ? "numeric" : "numeric score-invalid",
+        ),
+        cell(
+          "Team 1",
+          row.team1Players.replaceAll("|", " + "),
+          !row.validScore ? "" : team1Won ? "score-winner" : "score-loser",
+        ),
         cell("Score", row.team1Score, "numeric"),
-        cell("Team 2", row.team2Players.replaceAll("|", " + "), team1Won ? "score-loser" : "score-winner"),
+        cell(
+          "Team 2",
+          row.team2Players.replaceAll("|", " + "),
+          !row.validScore ? "" : team2Won ? "score-winner" : "score-loser",
+        ),
         cell("Score", row.team2Score, "numeric"),
       ];
     }),

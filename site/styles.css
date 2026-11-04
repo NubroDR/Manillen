@@ -385,6 +385,11 @@ select:focus-visible {
   color: var(--muted);
 }
 
+.score-invalid {
+  color: var(--danger);
+  font-weight: 700;
+}
+
 .reserve-footnote,
 .subtle-note {
   color: var(--muted);

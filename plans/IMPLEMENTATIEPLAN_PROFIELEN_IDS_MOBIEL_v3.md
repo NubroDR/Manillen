@@ -1,6 +1,6 @@
 # Implementatieplan v3: snelle statische mirror, Speeldagen, ID's en spelersprofielen
 
-**Status:** implementatie gestart — Fase 0 en Fase 1 niet volledig afgerond; statische preview live; Speeldagen-W-L en mobiele UI-feedback lokaal browser- en pytest-gevalideerd, previewacceptatie open
+**Status:** implementatie gestart — Fase 0 en Fase 1 niet volledig afgerond; statische preview live; Speeldagen-W-L, mobiele UI-feedback en gelijke-scorevalidatie lokaal getest; overige Fase 2-acceptatie en previewreview open
 **Scope:** publieke read-only mirror (herbouw als statische site), gedeelde berekeningen, centrale referentiedata, Speeldagen-rangschikking, spelersprofielen en mobile-first ontwerp.  
 **Belangrijke randvoorwaarde:** bestaande gebruikersdata in `data/` blijft onaangeroerd totdat een migratie expliciet is goedgekeurd, geback-upt en geverifieerd.
 
