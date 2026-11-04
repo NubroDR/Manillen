@@ -9,9 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
-from data_paths import DATA_DIR, assert_legacy_data_compatible
+from data_paths import DATA_DIR, data_path
 from manillen_core.data_helpers import (
-    load_all_players,
     load_pairing_counts,
     load_pairing_records,
     load_reserve_assignments,
@@ -21,6 +20,7 @@ from manillen_core.score_helpers import (
     is_valid_game_score,
     load_scores,
 )
+from manillen_core.reference_adapter import ReferenceAdapter
 from manillen_core.season_helpers import (
     MIN_GAMES_FOR_AWARD,
     compute_closed_season_awards,
@@ -332,17 +332,16 @@ def _season_snapshot(
 def build_snapshot(data_dir):
     """Build deterministic JSON-serializable derived data from a CSV directory."""
     data_dir = Path(data_dir).resolve()
-    assert_legacy_data_compatible(data_dir)
-    players_path = data_dir / "AllPlayers.csv"
-    pairings_path = data_dir / "pairings.csv"
-    history_path = data_dir / "pairings_history.csv"
-    scores_path = data_dir / "scores_history.csv"
-    assignments_path = data_dir / "reserve_assignments.csv"
-    seasons_path = data_dir / "seasons.csv"
+    adapter = ReferenceAdapter(data_dir)
+    pairings_path = data_path("pairings.csv", data_dir)
+    history_path = data_path("pairings_history.csv", data_dir)
+    scores_path = data_path("scores_history.csv", data_dir)
+    assignments_path = data_path("reserve_assignments.csv", data_dir)
+    seasons_path = data_path("seasons.csv", data_dir)
     legacy_seasons_path = data_dir / "seasons_history.csv"
     legacy_playdays_path = data_dir / "seasons_playdays_legacy.csv"
 
-    players = load_all_players(str(players_path))
+    players = adapter.player_pool()
     seasons = load_seasons(seasons_path)
     active = [season for season in seasons if season["Status"] == "actief"]
     if len(active) != 1:
@@ -367,7 +366,10 @@ def build_snapshot(data_dir):
     for row in all_history:
         assignments.setdefault(row["Date"], {})
     for play_date, values in load_reserve_assignments(assignments_path).items():
-        assignments.setdefault(play_date, {}).update(values)
+        assignments.setdefault(play_date, {}).update({
+            adapter.player_name(slot): adapter.player_name(reference)
+            for slot, reference in values.items()
+        })
 
     tool_awards = dict(compute_closed_season_awards(
         seasons_path,

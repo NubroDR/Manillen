@@ -5,7 +5,6 @@ import re
 from pathlib import Path
 
 from data_paths import DATA_DIR, active_data_dir, validate_active_data
-from manillen_core.data_helpers import load_all_players
 from manillen_core.reference_helpers import (
     normalize_reference_name,
     reserve_reference_token,
@@ -15,6 +14,15 @@ from manillen_core.reference_helpers import (
 def _read_rows(path):
     with Path(path).open("r", encoding="utf-8-sig", newline="") as file:
         return list(csv.DictReader(file))
+
+
+def _read_legacy_players(path):
+    with Path(path).open("r", encoding="utf-8", newline="") as file:
+        return [
+            row[0].strip()
+            for row in csv.reader(file)
+            if row and row[0].strip()
+        ]
 
 
 class ReferenceAdapter:
@@ -36,7 +44,11 @@ class ReferenceAdapter:
         self._pool = []
 
         if not self.is_versioned:
-            self._pool = load_all_players(self.data_root / "AllPlayers.csv")
+            players_path = self.data_root / "AllPlayers.csv"
+            self._pool = (
+                _read_legacy_players(players_path)
+                if players_path.exists() else []
+            )
             self._active_players = list(self._pool)
             return
 

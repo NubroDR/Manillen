@@ -12,9 +12,19 @@ from test_migrate_ids import make_migration_fixture, tree_hashes
 from versioned_data import validate_version_directory
 
 
-def _make_staging(tmp_path, name="staging"):
+def _make_staging(tmp_path, name="staging", active_season=False):
     data_root = tmp_path / "store"
     make_migration_fixture(data_root)
+    if active_season:
+        seasons_path = data_root / "seasons.csv"
+        with seasons_path.open("r", encoding="utf-8", newline="") as file:
+            seasons = list(csv.DictReader(file))
+        for season in seasons:
+            season["Status"] = "actief"
+        with seasons_path.open("w", encoding="utf-8", newline="") as file:
+            writer = csv.DictWriter(file, fieldnames=seasons[0].keys())
+            writer.writeheader()
+            writer.writerows(seasons)
     review_dir = tmp_path / f"{name}-review"
     review_dir.mkdir()
     proposal = build_id_proposal(data_root)
@@ -84,10 +94,10 @@ def test_full_backup_failure_leaves_no_partial_backup(tmp_path, monkeypatch):
     assert not list(backup_parent.iterdir())
 
 
-def test_activation_backs_up_before_atomic_switch_and_legacy_app_fails_closed(
+def test_activation_backs_up_before_atomic_switch_and_snapshot_uses_active_version(
     tmp_path,
 ):
-    data_root, staging_dir = _make_staging(tmp_path)
+    data_root, staging_dir = _make_staging(tmp_path, active_season=True)
     original_hashes = tree_hashes(data_root)
     backup_path = tmp_path / "backups" / "before-activation"
     backup_path.parent.mkdir()
@@ -105,8 +115,15 @@ def test_activation_backs_up_before_atomic_switch_and_legacy_app_fails_closed(
         assert_legacy_data_compatible(data_root)
     assert (data_root / "pairings.csv").is_file()
     assert (data_root / "versions" / active["active_version"] / "pairings.csv").is_file()
-    with pytest.raises(RuntimeError, match="legacy name-based CSV schema"):
-        build_snapshot(data_root)
+
+    manifest, files = build_snapshot(data_root)
+
+    assert manifest["activeSeason"] == "2025-2026"
+    assert files["players.json"] == ["Alice", "Bob"]
+    assert files["seasons/2025-2026.json"]["playdays"][0]["location"] == "Hall"
+    serialized = json.dumps(files, ensure_ascii=False)
+    assert "plr_" not in serialized
+    assert "loc_" not in serialized
 
 
 def test_staging_validator_rejects_unknown_references(tmp_path):

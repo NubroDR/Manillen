@@ -4,13 +4,21 @@
 
 **Basisregel voor alle tests:** gebruik uitsluitend tijdelijke testdata (`MANILLEN_DATA_DIR`); de echte `data/` blijft ongewijzigd.
 
-### Voortgang Fase 4 adaptergrondwerk (2026-11-04)
+### Voortgang Fase 4 adaptergrondwerk: eerste stap (2026-11-04)
 
 - `manillen_core/reference_adapter.py` kan op tijdelijke fixtures namen en aliassen naar PlayerID/LocationID vertalen, IDs terug naar zichtbare namen omzetten, de actieve pool scheiden van niet-poolspelers en reserve-labels naar `RESERVE:n` converteren. Zonder ID-versie blijft de naamgebaseerde legacyweergave behouden.
-- Pool/pairings, score- en reservehelpers zijn deels aangesloten op ID-opslag. Pair-counts worden bij indeling naar namen vertaald; scorelezing en standen tonen namen en gekoppelde reservepersonen. Dit is nog geen volledige integratie van de hoofdapp, Exceluitvoer of publicatiegenerator.
+- Pool/pairings, score- en reservehelpers zijn in deze eerste stap deels aangesloten op ID-opslag. De latere aanvullingen voor hoofdapp, Excel en snapshot staan hieronder.
 - **Validatie:** `.venv\Scripts\python.exe -m pytest -q tests\test_reference_adapter.py tests\test_reserve_assignments.py tests\test_score_functions.py` — `18 passed`; volledige `.venv\Scripts\python.exe -m pytest -q` — `94 passed`. `compileall` voor gewijzigde Pythonmodules en `git diff --check` slaagden.
-- Geen F4-acceptatietest wordt hiermee als volledig geslaagd beschouwd. `assert_legacy_data_compatible` blijft actief; er is geen echte datastore gebruikt en geen migratie of publicatie uitgevoerd.
-- **Volgende stap:** integreer en test de resterende `app.py`-lees-/schrijfstromen en gedeelde historiehelpers met `data_path`, inclusief UI-/historie-/locatie-/Excelnaamweergave; sluit daarna de snapshotgenerator aan op tijdelijke ID-datasets. Pas de fail-closed controle pas aan nadat alle relevante routes end-to-end zijn getest.
+- Geen F4-acceptatietest werd op dit tussenmoment als volledig geslaagd beschouwd; alleen tijdelijke fixtures werden gebruikt.
+- **Vervolg:** de app-, historie-, locatie-, Excel- en snapshot-/archiefintegratie is op tijdelijke ID-datasets aangesloten; zie de bijgewerkte Fase 4-voortgang hieronder. Voltooi nu de resterende F4-pariteits- en deploymentacceptatie voordat productieactivatie kan worden overwogen.
+
+### Voortgang Fase 4 app-/Excelintegratie (2026-11-04)
+
+- `app.py` resolveert de actieve versiegebonden CSV's en start nu ook met een gevalideerde ID-versie; legacyseizoensbronnen en scorebladbestanden blijven in de datastore-root. De naamgebaseerde UI toont spelers, locaties en speeldagen via de adapter.
+- Gedeelde historie-/locatie-/seizoensspeeldaghelpers, pairing-update/verwijdering en Excelgeneratie zijn op ID-fixtures getest. De tests controleren zichtbare namen in de historie en scorebladen, reservekoppeling, locatie, seizoenaanwezigheid en behoud van pair-counts en ID-opslag na update/verwijdering.
+- Gerichte validatie: `.venv\Scripts\python.exe -m pytest -q tests\test_reference_adapter.py tests\test_season_helpers.py tests\test_reserve_assignments.py tests\test_score_functions.py` — `39 passed`.
+- Alleen tijdelijke fixtures gebruikt; geen echte datastore aangeraakt, geen migratie toegepast en geen GitHub-publicatie gestart. De generator en lokale JSON-archiefopbouw exporteren geen IDs. Snapshot-/archieftests: `19 passed`; volledige regressiesuite na de generatorwijziging: `.venv\Scripts\python.exe -m pytest -q` — `99 passed`; `compileall` en `git diff --check` slaagden. F4-acceptatietests zijn nog niet volledig uitgevoerd.
+- **Volgende stap:** voltooi de resterende F4-pariteits- en deploymentacceptatie, waaronder NAS-startup en GitHub-upload/workflowdispatch op veilige fixtures; productieactivatie blijft geblokkeerd.
 
 ### Uitvoeringsstatus Fase 0 (2026-10-25)
 
@@ -92,7 +100,7 @@
 - `versioned_data.py` valideert alle negen schemas, ID-formaten, aliassen en CSV-referenties. Ongeldig JSON/schema, ongeldige of ontbrekende versie, ontbrekende bestanden en referentiefouten stoppen expliciet.
 - `data_versions.py` maakt een unieke full-backup en controleert die op bestands-hashes; activatie bouwt de versie onder `versions/` en gebruikt een atomische manifest-replace. Foutinjectie vóór replace bevestigt dat de oude legacyversie actief blijft.
 - Rollback is getest naar legacydata; wijzigingen na activering worden met rij-aantallen gemeld en rollback weigert zonder `confirm_data_loss`. Een geverifieerde backup wordt ook vóór rollback gemaakt.
-- De schrijfbare app en snapshotgenerator weigeren ID-data zolang hun naamgebaseerde adapter nog actief is. Geen productie- of NAS-data gebruikt.
+- In deze Fase 3-mijlpaal weigerden de toenmalige schrijfbare app en snapshotgenerator ID-data; de Fase 4-integratie hieronder heeft die lokale blokkade inmiddels vervangen. Geen productie- of NAS-data gebruikt.
 - **Nog open:** Docker-startup, foutinjectie tijdens installatiekopie, rollback naar een vorige ID-versie en Fase 4-adapterintegratie; uitsluitend tijdelijke fixtures.
 
 ### Mobiele UI-feedback (2026-11-04)

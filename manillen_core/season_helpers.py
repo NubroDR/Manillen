@@ -282,11 +282,11 @@ def load_legacy_seasons(seasons_path, playdays_path=None, pool_players=None):
     return result
 
 
-def load_season_playdays(history_path, season_label):
+def load_season_playdays(history_path, season_label, reference_adapter=None):
     """Summarize current-tool-season dates and the attendees recorded per date."""
     attendees_by_date = {}
     locations_by_date = {}
-    for row in load_pairing_records(history_path):
+    for row in load_pairing_records(history_path, reference_adapter):
         if row["Season"] == season_label:
             attendees_by_date.setdefault(row["Date"], set()).update(row["Players"])
             if row["Location"]:

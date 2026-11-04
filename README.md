@@ -158,7 +158,7 @@ python stage_ids.py --data-dir "<tijdelijke datastore>" `
   --staging-output "<private stagingmap>"
 ```
 
-`data_paths.py` ondersteunt `active-version.json`: zonder manifest blijft de huidige datastore-root actief; met manifest worden de negen ID-CSV's uit `versions/<active_version>/` gecontroleerd op schema's en verwijzingen. Legacybronnen en scorebladen blijven in de root. `data_versions.py` biedt full-backup en manifest-activering/rollback:
+`data_paths.py` ondersteunt `active-version.json`: zonder manifest blijft de huidige datastore-root actief; met manifest worden de negen ID-CSV's uit `versions/<active_version>/` gecontroleerd op schema's en verwijzingen. De schrijfbare Shiny-app leest en schrijft in die actieve versie en toont namen in de UI en Excel-uitvoer; legacyseizoensbronnen en scorebladbestanden blijven in de datastore-root. De snapshotgenerator en archiefopbouw lezen de actieve ID-versie en exporteren alleen namen en afgeleide JSON; deze ID-route is op tijdelijke fixtures getest. `data_versions.py` biedt full-backup en manifest-activering/rollback:
 
 ```powershell
 python data_versions.py activate --data-dir "<testdatastore>" `
@@ -170,7 +170,7 @@ python data_versions.py rollback --data-dir "<testdatastore>" `
 
 De backup is een unieke, geverifieerde kopie van de volledige datastore. Activering kopieert een gevalideerde stagingversie naar `versions/` en wijzigt daarna alleen `active-version.json` via een tijdelijke file en atomische replace; vóór die replace blijft de vorige versie actief. Rollback weigert standaard als bestanden sinds activering zijn veranderd en rapporteert de rij-aantallen; `--confirm-data-loss` is vereist om die wijzigingen bewust te laten vallen. Oude versies worden nooit verwijderd.
 
-**Niet op de echte NAS-datastore toepassen.** De huidige schrijfbare app en mirror gebruiken nog naamgebaseerde CSV's. Ze weigeren daarom expliciet te starten/publiceren wanneer een ID-versie actief is. Een activatie op productie zou de app buiten gebruik zetten totdat Fase 4 de ID-adapter heeft opgeleverd en uitgerold. Gebruik deze commando's nu alleen met tijdelijke testdata.
+**Niet op de echte NAS-datastore toepassen.** De hoofdapp, scorebladexport en snapshot-/archiefopbouw zijn op tijdelijke fixtures met een actieve ID-versie getest, maar de volledige Fase 4-acceptatie en productievalidatie zijn nog open. Productieactivatie blijft geblokkeerd totdat de volledige regressie- en acceptatiesuite, deployment-/rollbackcontrole en aparte migratiegoedkeuring gereed zijn. Gebruik deze commando's nu alleen met tijdelijke testdata.
 
 ## Statische mirror-preview (preview live; productiecutover open)
 

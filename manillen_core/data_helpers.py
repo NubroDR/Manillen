@@ -8,16 +8,27 @@ from pathlib import Path
 DEFAULT_SEASON = "2026-2027"
 
 
-def load_pairing_records(history_filename):
+def load_pairing_records(history_filename, reference_adapter=None):
     """Return valid history rows with their date, table, players, and season."""
     path = Path(history_filename)
     if not path.exists():
         return []
+    adapter = reference_adapter
+    if adapter is None:
+        from manillen_core.reference_adapter import ReferenceAdapter
+
+        adapter = ReferenceAdapter.for_data_file(path)
     records = []
     with path.open("r", encoding="utf-8", newline="") as file:
         for row in csv.DictReader(file):
             play_date = row.get("Date", "").strip()
-            players = [name.strip() for name in row.get("Players", "").split("|")]
+            players = [
+                adapter.player_name(name) if name else ""
+                for name in (
+                    token.strip()
+                    for token in row.get("Players", "").split("|")
+                )
+            ]
             try:
                 table = int(row.get("Table", ""))
             except (TypeError, ValueError):
@@ -29,15 +40,17 @@ def load_pairing_records(history_filename):
                 "Table": table,
                 "Players": players,
                 "Season": (row.get("Season") or "").strip() or DEFAULT_SEASON,
-                "Location": (row.get("Location") or "").strip(),
+                "Location": adapter.location_name(
+                    (row.get("Location") or "").strip()
+                ),
             })
     return records
 
 
-def load_pairing_locations(history_filename):
+def load_pairing_locations(history_filename, reference_adapter=None):
     """Return the non-empty location recorded for each playday."""
     locations = {}
-    for row in load_pairing_records(history_filename):
+    for row in load_pairing_records(history_filename, reference_adapter):
         if row["Location"]:
             locations.setdefault(row["Date"], row["Location"])
     return locations
@@ -55,10 +68,10 @@ def load_all_players(players_filename):
         ]
 
 
-def load_pairing_history(history_filename):
+def load_pairing_history(history_filename, reference_adapter=None):
     """Return history grouped by date as ``{date: [(table, players), ...]}``."""
     grouped = defaultdict(list)
-    for row in load_pairing_records(history_filename):
+    for row in load_pairing_records(history_filename, reference_adapter):
         grouped[row["Date"]].append((row["Table"], row["Players"]))
     return {
         play_date: sorted(tables, key=lambda item: item[0])
@@ -66,11 +79,16 @@ def load_pairing_history(history_filename):
     }
 
 
-def load_pairing_counts(pairings_filename):
+def load_pairing_counts(pairings_filename, reference_adapter=None):
     """Return valid pairing rows as ``[(player1, player2, count), ...]``."""
     path = Path(pairings_filename)
     if not path.exists():
         return []
+    adapter = reference_adapter
+    if adapter is None:
+        from manillen_core.reference_adapter import ReferenceAdapter
+
+        adapter = ReferenceAdapter.for_data_file(path)
     rows = []
     with path.open("r", encoding="utf-8", newline="") as file:
         for row in csv.DictReader(file):
@@ -81,6 +99,8 @@ def load_pairing_counts(pairings_filename):
             player1 = row.get("Player1", "").strip()
             player2 = row.get("Player2", "").strip()
             if player1 and player2 and count >= 0:
+                player1 = adapter.player_name(player1)
+                player2 = adapter.player_name(player2)
                 rows.append((player1, player2, count))
     return rows
 

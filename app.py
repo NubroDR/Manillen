@@ -6,12 +6,11 @@ from pathlib import Path
 
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 
-from data_paths import DATA_DIR, assert_legacy_data_compatible
+from data_paths import DATA_DIR, active_data_dir, data_path
 from manillen_functions import (
     create_player_pool,
     delete_pairings_by_date,
     fill_scorebladen_from_history,
-    load_all_players,
     load_pair_counts,
     make_groups_greedy,
     update_pairs_in_csv,
@@ -28,6 +27,7 @@ from manillen_core.data_helpers import (
     load_pairing_locations,
     load_pairing_records,
 )
+from manillen_core.reference_adapter import ReferenceAdapter
 from manillen_core.season_helpers import (
     DEFAULT_SEASON,
     MIN_GAMES_FOR_AWARD,
@@ -44,7 +44,6 @@ from manillen_core.season_helpers import (
     sort_season_rows_newest_first,
 )
 from reserve_assignments import (
-    DEFAULT_ASSIGNMENTS_FILE,
     get_reserve_assignments,
     required_reserve_count,
     reserve_name_matches_pool,
@@ -55,18 +54,19 @@ from github_publish import GitHubPublishError, trigger_mirror_workflow
 
 
 BASE_DIR = Path(__file__).resolve().parent
-CSV_PAIRINGS = DATA_DIR / "pairings.csv"
-ALL_PLAYERS_FILE = DATA_DIR / "AllPlayers.csv"
-HISTORY_FILE = DATA_DIR / "pairings_history.csv"
+ACTIVE_DATA_DIR = active_data_dir(DATA_DIR)
+REFERENCE_ADAPTER = ReferenceAdapter(DATA_DIR)
+CSV_PAIRINGS = data_path("pairings.csv", DATA_DIR)
+HISTORY_FILE = data_path("pairings_history.csv", DATA_DIR)
 SCOREBLAD_TEMPLATE = DATA_DIR / "Scorebladen.xlsx"
 SCOREBLAD_OUTPUT_DIR = DATA_DIR / "Scorebladen"
-SCORES_FILE = DATA_DIR / "scores_history.csv"
-SEASONS_FILE = DATA_DIR / "seasons.csv"
+SCORES_FILE = data_path("scores_history.csv", DATA_DIR)
+SEASONS_FILE = data_path("seasons.csv", DATA_DIR)
 LEGACY_SEASONS_FILE = DATA_DIR / "seasons_history.csv"
 LEGACY_PLAYDAYS_FILE = DATA_DIR / "seasons_playdays_legacy.csv"
-RESERVE_ASSIGNMENTS_FILE = DEFAULT_ASSIGNMENTS_FILE
-assert_legacy_data_compatible(DATA_DIR)
-ensure_season_data(DATA_DIR)
+RESERVE_ASSIGNMENTS_FILE = data_path("reserve_assignments.csv", DATA_DIR)
+if ACTIVE_DATA_DIR == DATA_DIR:
+    ensure_season_data(DATA_DIR)
 APP_CSS = (BASE_DIR / "www" / "manillen.css").read_text(encoding="utf-8")
 
 
@@ -74,7 +74,7 @@ def _history_dates(season=None):
     return sorted(
         {
             row["Date"]
-            for row in load_pairing_records(HISTORY_FILE)
+            for row in load_pairing_records(HISTORY_FILE, REFERENCE_ADAPTER)
             if season is None or row["Season"] == season
         },
         reverse=True,
@@ -84,7 +84,7 @@ def _history_dates(season=None):
 def _location_choices():
     locations = {
         row["Location"]
-        for row in load_pairing_records(HISTORY_FILE)
+        for row in load_pairing_records(HISTORY_FILE, REFERENCE_ADAPTER)
         if row["Location"]
     }
     for season in load_legacy_seasons(
@@ -101,13 +101,15 @@ def _location_choices():
 def _read_history():
     return {
         play_date: [(str(table), players) for table, players in tables]
-        for play_date, tables in load_pairing_history(HISTORY_FILE).items()
+        for play_date, tables in load_pairing_history(
+            HISTORY_FILE, REFERENCE_ADAPTER
+        ).items()
     }
 
 
 def _history_for_season(season=None):
     grouped = {}
-    for row in load_pairing_records(HISTORY_FILE):
+    for row in load_pairing_records(HISTORY_FILE, REFERENCE_ADAPTER):
         if season is not None and row["Season"] != season:
             continue
         grouped.setdefault(row["Date"], []).append(
@@ -120,7 +122,10 @@ def _history_for_season(season=None):
 
 
 def _pairings_table(selected_player=None):
-    rows = [row for row in load_pairing_counts(CSV_PAIRINGS) if row[2] > 0]
+    rows = [
+        row for row in load_pairing_counts(CSV_PAIRINGS, REFERENCE_ADAPTER)
+        if row[2] > 0
+    ]
 
     if not rows:
         return ui.div("Nog geen paringen gevonden.", class_="empty-state")
@@ -190,7 +195,9 @@ def _seasons_overview():
             awards.get("Silver", ""),
             awards.get("Bronze", ""),
             awards.get("RedLantern", ""),
-            load_season_playdays(HISTORY_FILE, season["Season"]),
+            load_season_playdays(
+                HISTORY_FILE, season["Season"], REFERENCE_ADAPTER
+            ),
         ))
     if not rows:
         return ui.div("Nog geen seizoenen gevonden.", class_="empty-state")
@@ -493,7 +500,7 @@ def _history_cards(season=None):
     future_dates = sorted(item for item in history if item > today)
     played_dates = sorted((item for item in history if item <= today), reverse=True)
     sections = []
-    locations = load_pairing_locations(HISTORY_FILE)
+    locations = load_pairing_locations(HISTORY_FILE, REFERENCE_ADAPTER)
     if future_dates:
         sections.append(ui.h2("Toekomstige speeldag", class_="history-section-title"))
 
@@ -539,7 +546,7 @@ def _history_cards(season=None):
     return ui.div(*sections)
 
 
-players = sorted(load_all_players(ALL_PLAYERS_FILE), key=str.casefold)
+players = sorted(REFERENCE_ADAPTER.player_pool(), key=str.casefold)
 history_choices = _history_dates()
 seasons = load_seasons(SEASONS_FILE)
 active_season = get_active_season(SEASONS_FILE)

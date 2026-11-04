@@ -531,15 +531,22 @@ def update_pairs_in_csv(
             if any(is_reserve_reference(player) for player in pair):
                 continue
 
-            pair_key = tuple(sorted(adapter.player_id(player) for player in pair))
+            pair_key = tuple(sorted(
+                adapter.player_name(adapter.player_id(player))
+                for player in pair
+            ))
             pair_counts[pair_key] += 1
             pairs_added += 1
     
     # Write back to CSV
+    stored_pair_counts = {
+        tuple(sorted(adapter.player_id(player) for player in pair)): count
+        for pair, count in pair_counts.items()
+    }
     with open(csv_filename, 'w', encoding='utf-8', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['Player1', 'Player2', 'Count'])  # Header
-        for (p1, p2), count in sorted(pair_counts.items()):
+        for (p1, p2), count in sorted(stored_pair_counts.items()):
             writer.writerow([p1, p2, count])
 
     if history_filename:
@@ -557,6 +564,7 @@ def update_pairs_in_csv(
 
 def delete_pairings_by_date(play_date, csv_filename=str(DATA_DIR / 'pairings.csv'), history_filename=str(DATA_DIR / 'pairings_history.csv')):
     """Delete pairings for a given play date from history and decrement counts."""
+    adapter = ReferenceAdapter.for_data_file(history_filename)
     history_rows = []
     removed_rows = []
 
@@ -586,7 +594,11 @@ def delete_pairings_by_date(play_date, csv_filename=str(DATA_DIR / 'pairings.csv
     # Load current pair counts and decrement for removed tables
     pair_counts = load_pair_counts(csv_filename)
     for _, _, players in removed_rows:
-        participants = [p.strip() for p in players.split('|') if p.strip()]
+        participants = [
+            adapter.player_name(p.strip())
+            for p in players.split('|')
+            if p.strip()
+        ]
         for pair in it.combinations(participants, 2):
             # Skip pairs with Reserve players, same as when adding pairs
             if any(is_reserve_reference(player) for player in pair):
@@ -595,11 +607,15 @@ def delete_pairings_by_date(play_date, csv_filename=str(DATA_DIR / 'pairings.csv
             current_count = pair_counts.get(pair_key, 0)
             pair_counts[pair_key] = max(0, current_count - 1)
 
-    # Write updated pair counts back to CSV
+    # Write updated pair counts back to CSV using the active storage references.
+    stored_pair_counts = {
+        tuple(sorted(adapter.player_id(player) for player in pair)): count
+        for pair, count in pair_counts.items()
+    }
     with open(csv_filename, 'w', encoding='utf-8', newline='') as f:
         writer = csv.writer(f)
         writer.writerow(['Player1', 'Player2', 'Count'])
-        for (p1, p2), count in sorted(pair_counts.items()):
+        for (p1, p2), count in sorted(stored_pair_counts.items()):
             writer.writerow([p1, p2, count])
 
     # Write updated history file without removed date entries
