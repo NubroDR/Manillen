@@ -144,6 +144,43 @@ def test_profile_reports_invalid_reserve_slot_tokens(tmp_path):
     }]
 
 
+def test_profile_reports_normalized_alias_conflicts_without_names_by_default(tmp_path):
+    data_dir = tmp_path / "fixture"
+    make_profile_fixture(data_dir)
+    write_csv(
+        data_dir / "player_aliases.csv",
+        ["Alias", "PlayerID", "Source"],
+        [
+            {"Alias": "Alice", "PlayerID": "plr_aaaaa", "Source": "manual"},
+            {"Alias": " alice ", "PlayerID": "plr_bbbbb", "Source": "manual"},
+        ],
+    )
+    before = {
+        path.name: path.read_bytes()
+        for path in data_dir.iterdir()
+        if path.is_file()
+    }
+
+    redacted = profile_data(data_dir)
+    detailed = profile_data(data_dir, include_names=True)
+
+    redacted_conflict = redacted["data_quality"]["alias_registry"]["conflicts"][0]
+    detailed_conflict = detailed["data_quality"]["alias_registry"]["conflicts"][0]
+    assert redacted_conflict == {
+        "file": "player_aliases.csv",
+        "targets": 2,
+        "rows": [2, 3],
+    }
+    assert detailed_conflict["alias"] == "alice"
+    assert detailed_conflict["target_ids"] == ["plr_aaaaa", "plr_bbbbb"]
+    assert redacted["files"]["player_aliases.csv"]["schema_valid"] is True
+    assert {
+        path.name: path.read_bytes()
+        for path in data_dir.iterdir()
+        if path.is_file()
+    } == before
+
+
 def test_profile_cli_emits_json_for_data_dir(tmp_path):
     data_dir = tmp_path / "fixture"
     make_profile_fixture(data_dir)

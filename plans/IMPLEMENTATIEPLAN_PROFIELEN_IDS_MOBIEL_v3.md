@@ -1,11 +1,13 @@
 # Implementatieplan v3: snelle statische mirror, Speeldagen, ID's en spelersprofielen
 
-**Status:** implementatie gestart — Fase 0 en Fase 1 niet volledig afgerond; Amsterdamse gepasseerd-status en middernachttimer voor Speeldagen gecontroleerd; F2-24 en overige Fase 2-acceptatie nog open; timer- en faviconwijzigingen worden op de preview uitgerold
+**Status:** implementatie gestart — Fase 0 en Fase 1 niet volledig afgerond; Fase 2 grotendeels geïmplementeerd maar F2-24 en overige acceptatie nog open; Fase 3 read-only ID-proposal gestart, staging/apply nog niet geïmplementeerd
 **Scope:** publieke read-only mirror (herbouw als statische site), gedeelde berekeningen, centrale referentiedata, Speeldagen-rangschikking, spelersprofielen en mobile-first ontwerp.  
 **Belangrijke randvoorwaarde:** bestaande gebruikersdata in `data/` blijft onaangeroerd totdat een migratie expliciet is goedgekeurd, geback-upt en geverifieerd.
 
 ### Overdracht voor volgende sessie (2026-11-04)
 
+- **Fase 3 voortgang:** `migrate_ids.py` bouwt een privé JSON-voorstel met cryptografisch willekeurige, botsingsgecontroleerde speler-/locatie-ID's, exacte naamnormalisatie, aliassen, bronhashes en de bestaande datakwaliteitsrapportage. Uitvoer moet expliciet buiten de datastore staan, overschrijven is verboden en het voorstel blijft pending; niet-poolspelers en locaties vereisen handmatige `Active`-review. Er is geen apply- of activatieroute. `profile_data.py` rapporteert nu ook conflicterende genormaliseerde aliasmappingen; beide profilers blijven standaard naamgeredigeerd. Er is niet tegen repository-`data/` of NAS-data gedraaid.
+- **Validatie Fase 3-voorstel:** gerichte tests `13 passed` met `tests/test_migrate_ids.py` en `tests/test_profile_data.py`; volledige suite `66 passed`; Problems gaf geen fouten. Eerstvolgende stap: stagingtransformatie tegen een expliciet goedgekeurd voorstel, nog steeds alleen met tijdelijke fixtures.
 - **Aanvulling:** de Speeldagen-timer berekent nu de eerstvolgende lokale middernacht in plaats van periodiek te pollen. Op de live preview bleef W-L 1 ms voor middernacht verborgen, verscheen op exact middernacht de melding voor vandaag en kwam W-L zonder handmatige refresh na de volgende middernacht terug. De berekening gaf ook de juiste UTC-middernacht rond beide DST-wissels; F2-24 (andere browsertijdzones) blijft open. De nieuwe statische previewbundel bevat ook een eigen SVG-favicon. Productie-`docs/` blijft onaangeroerd; de productiepagina heeft al een bestaand favicon.
 - **Previewdeploy geslaagd:** commit `5734751` / Pages-run `41812316286`. De live previewlinkt het SVG-favicon correct en serveert het met `image/svg+xml` en HTTP 200; de productie-`favicon.ico` antwoordt ook met HTTP 200.
 - **Validatie aanvulling:** volledige pytest-suite `58 passed`; na toevoeging van de favicon slaagden de gerichte statische-buildtests `15 passed`.

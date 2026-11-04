@@ -12,6 +12,10 @@ from itertools import combinations
 from pathlib import Path
 
 from data_paths import DATA_DIR
+from manillen_core.reference_helpers import (
+    is_reserve_reference as _is_reserve,
+    normalize_reference_name as _normalize_name,
+)
 
 
 CSV_SCHEMAS = {
@@ -108,18 +112,13 @@ VERSIONED_CSV_CANDIDATES = (
     "locations.csv",
     "location_aliases.csv",
 )
+OPTIONAL_ALIAS_SCHEMAS = {
+    "player_aliases.csv": ("Alias", "PlayerID", "Source"),
+    "location_aliases.csv": ("Alias", "LocationID", "Source"),
+}
 
-_RESERVE_PATTERN = re.compile(r"^reserve(?:\s+([1-9]\d*)|:([1-9]\d*))$", re.IGNORECASE)
 _RESERVE_PREFIX = re.compile(r"^reserve(?:\b|:)", re.IGNORECASE)
 _AWARD_FIELDS = ("Gold", "Silver", "Bronze", "RedLantern")
-
-
-def _normalize_name(value):
-    return " ".join(str(value).split()).casefold()
-
-
-def _is_reserve(value):
-    return bool(_RESERVE_PATTERN.fullmatch(str(value).strip()))
 
 
 def _invalid_reserve_tokens(rows, filename, columns, include_names):
@@ -177,6 +176,41 @@ def _group_reference(group_id, name_occurrences, include_names):
     return result
 
 
+def _inspect_alias_rows(alias_rows, include_names):
+    conflicts = []
+    issues = []
+    for filename, rows in alias_rows.items():
+        target_column = "PlayerID" if filename == "player_aliases.csv" else "LocationID"
+        targets_by_alias = defaultdict(set)
+        rows_by_alias = defaultdict(list)
+        for row_number, row in enumerate(rows, start=2):
+            alias = (row.get("Alias") or "").strip()
+            target = (row.get(target_column) or "").strip()
+            if not alias or not target:
+                issues.append({
+                    "file": filename,
+                    "row": row_number,
+                    "issue": "missing_alias_or_target",
+                })
+                continue
+            normalized = _normalize_name(alias)
+            targets_by_alias[normalized].add(target)
+            rows_by_alias[normalized].append(row_number)
+        for normalized, targets in sorted(targets_by_alias.items()):
+            if len(targets) < 2:
+                continue
+            conflict = {
+                "file": filename,
+                "targets": len(targets),
+                "rows": rows_by_alias[normalized],
+            }
+            if include_names:
+                conflict["alias"] = normalized
+                conflict["target_ids"] = sorted(targets)
+            conflicts.append(conflict)
+    return conflicts, issues
+
+
 def profile_data(data_dir=DATA_DIR, include_names=False, repo_root=None):
     """Return a deterministic, read-only report for a Manillen data directory."""
     data_dir = Path(data_dir).resolve()
@@ -209,6 +243,29 @@ def profile_data(data_dir=DATA_DIR, include_names=False, repo_root=None):
         }
         rows_by_file[filename] = rows
         if not valid:
+            schema_issues.append({
+                "file": filename,
+                "issue": "unexpected_columns",
+            })
+
+    alias_rows = {}
+    alias_registry_files = {}
+    for filename, expected_schema in OPTIONAL_ALIAS_SCHEMAS.items():
+        path = data_dir / filename
+        alias_registry_files[filename] = path.is_file()
+        if not path.is_file():
+            alias_rows[filename] = []
+            continue
+        columns, rows = _read_dict_csv(path)
+        alias_rows[filename] = rows
+        file_report[filename] = {
+            "exists": True,
+            "expected_columns": list(expected_schema),
+            "columns": columns,
+            "rows": len(rows),
+            "schema_valid": columns == list(expected_schema),
+        }
+        if columns != list(expected_schema):
             schema_issues.append({
                 "file": filename,
                 "issue": "unexpected_columns",
@@ -438,6 +495,9 @@ def profile_data(data_dir=DATA_DIR, include_names=False, repo_root=None):
             include_names,
         )
     )
+    alias_conflicts, alias_issues = _inspect_alias_rows(
+        alias_rows, include_names
+    )
 
     return {
         "report_version": 1,
@@ -450,8 +510,9 @@ def profile_data(data_dir=DATA_DIR, include_names=False, repo_root=None):
             "unknown_name_groups": unknown_names,
             "invalid_references": unknown_names,
             "alias_registry": {
-                "player_aliases.csv": (data_dir / "player_aliases.csv").is_file(),
-                "location_aliases.csv": (data_dir / "location_aliases.csv").is_file(),
+                **alias_registry_files,
+                "conflicts": alias_conflicts,
+                "issues": alias_issues,
                 "note": "No alias mapping is inferred or applied.",
             },
             "pairing_history_issues": validation_issues,

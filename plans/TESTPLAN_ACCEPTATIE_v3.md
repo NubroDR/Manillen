@@ -61,6 +61,14 @@
 - De timer plant nu de eerstvolgende Amsterdamse middernacht in plaats van elke 30 seconden te pollen. De geplande UTC-tijdstippen rond zowel de zomer- als wintertijdwissel van 2026 zijn gecontroleerd (F2-25).
 - Alternatieve browsertijdzones (F2-24) zijn nog niet getest: de browseromgeving stond niet toe extra tijdzonecontexten te openen. De datum- en timerberekening gebruiken expliciet `Europe/Amsterdam`.
 
+### Voortgang Fase 3: read-only ID-voorstel (2026-11-04)
+
+- `migrate_ids.py` maakt een nieuw JSON-voorstel buiten de datastore met speler-/locatie-ID's, normalisatie-aliassen, bronhashes en datakwaliteitsbevindingen; het markeert het voorstel als `pending` en heeft geen apply-route.
+- `profile_data.py` meldt aliassen die na hoofdletter-/spatie-normalisatie naar meerdere ID's wijzen; de standaardrapportage geeft de aliassleutel en doel-ID's niet prijs.
+- Tests op tijdelijke fixtures bevestigen de ID-prefixen/alfabetten, collision retry, poolstatus, reserve-placeholders, handmatige statusreview voor niet-poolspelers en locaties, weigeren van output in de datastore en weigeren van overschrijven. De hashcontrole omvat ook bestaande scorebladbestanden en de geneste `Scorebladen/`-map.
+- `tests/test_migrate_ids.py` en `tests/test_profile_data.py`: `13 passed`. Geen echte of NAS-data gebruikt.
+- **Open:** F3-08 t/m F3-38 en resterende alias-/referentiële validatie, inclusief expliciete mappinggoedkeuring, versioned staging, validatie, backup en atomische activatie/rollback. Het huidige voorstel mag niet worden toegepast.
+
 ### Mobiele UI-feedback (2026-11-04)
 
 - Donkere modus gebruikt nu ook een donkere achtergrondgloed in plaats van de lichte decoratieve cirkel. Mobiele tabellen blijven semantische tabellen in een eigen horizontaal scrollgebied met zichtbare kolomkoppen en een vaste eerste kolom; de kaartweergave is verwijderd voor Tussenstand, Seizoenen, Scores en Parenhistoriek.

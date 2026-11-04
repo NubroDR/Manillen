@@ -47,7 +47,7 @@ Kortom: als een wijziging "groot" is, dan is een README-update verplicht. Als ee
 .
 ├── app.py                    # Volledige schrijfbare NAS-app.
 ├── data_paths.py             # Data-directory, configureerbaar via MANILLEN_DATA_DIR.
-├── manillen_core/            # Gedeelde pure CSV-, seizoen- en scoreberekeningen.
+├── manillen_core/            # Gedeelde CSV-, seizoen-, score- en referentiehelpers.
 ├── manillen_functions.py     # Indeling, paringen en scorebladlogica.
 ├── score_functions.py        # Schrijfbare scoreworkflow met gedeelde scoreberekening.
 ├── reserve_assignments.py    # Datumgebonden CRUD voor ingevulde reservenamen.
@@ -62,6 +62,7 @@ Kortom: als een wijziging "groot" is, dan is een README-update verplicht. Als ee
 ├── publish_mirror.py         # Bouwt de statische mirror uit CSV-data of een JSON-archief.
 ├── generate_static_snapshot.py # Afgeleide JSON voor de nieuwe statische mirror.
 ├── build_static_site.py      # Bouwt een statische preview in een lege outputmap.
+├── migrate_ids.py            # Maakt een privé, alleen-lezen ID-migratievoorstel.
 ├── site/                     # Bronbestanden van de nieuwe vanilla-JS preview.
 ├── static_snapshot.zip       # JSON-only invoerarchief voor de handmatige Pages-workflow.
 ├── data/
@@ -111,13 +112,21 @@ De tests zetten `MANILLEN_DATA_DIR` naar een tijdelijke map. `tests/`, `requirem
 
 ## Datamigratie nulmeting
 
-`profile_data.py` maakt een read-only JSON-rapport met CSV-schema's en aantallen, naamvarianten en onbekende verwijzingen, ongeldige of gelijke scores, drift tussen partnercounts en pairing history, en de huidige imports en CSV-routes. Het leest standaard de geconfigureerde `MANILLEN_DATA_DIR` (of `data/`) en schrijft niets naar de datastore:
+`profile_data.py` maakt een read-only JSON-rapport met CSV-schema's en aantallen, naamvarianten en onbekende verwijzingen, conflicterende aliassen, ongeldige of gelijke scores, drift tussen partnercounts en pairing history, en de huidige imports en CSV-routes. Het leest standaard de geconfigureerde `MANILLEN_DATA_DIR` (of `data/`) en schrijft niets naar de datastore:
 
 ```powershell
 python profile_data.py
 ```
 
 Namen zijn standaard weggelaten uit het rapport. Voeg `--include-names` alleen toe voor een lokale, private mappingreview; deel of publiceer die uitvoer niet. Een alternatieve datastore kan met `--data-dir <pad>` worden gecontroleerd.
+
+`migrate_ids.py` maakt de eerste alleen-lezen stap van Fase 3: een JSON-voorstel met willekeurige PlayerID's/LocationID's, aliassen, bronhashes en de datakwaliteitsbevindingen. Geef altijd een nieuwe outputlocatie buiten de datastore op:
+
+```powershell
+python migrate_ids.py --data-dir "<datastore>" --proposal-output "<private reviewmap>\manillen-id-proposal.json"
+```
+
+Het voorstel bevat namen en is dus privé. Het commando weigert de actieve datastore als uitvoerlocatie, overschrijft geen bestaand voorstel en verandert geen bronbestanden. Het voorstel blijft `pending`; niet-poolspelers en locaties krijgen geen automatische actieve status. Er is nog geen apply-, activatie- of rollbackcommando; gebruik de JSON niet als goedgekeurde migratie.
 
 ## Statische mirror-preview (preview live; productiecutover open)
 
