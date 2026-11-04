@@ -63,6 +63,7 @@ Kortom: als een wijziging "groot" is, dan is een README-update verplicht. Als ee
 ├── generate_static_snapshot.py # Afgeleide JSON voor de nieuwe statische mirror.
 ├── build_static_site.py      # Bouwt een statische preview in een lege outputmap.
 ├── migrate_ids.py            # Maakt een privé, alleen-lezen ID-migratievoorstel.
+├── stage_ids.py              # Bouwt een gevalideerde, inactieve ID-stagingversie.
 ├── site/                     # Bronbestanden van de nieuwe vanilla-JS preview.
 ├── static_snapshot.zip       # JSON-only invoerarchief voor de handmatige Pages-workflow.
 ├── data/
@@ -126,7 +127,35 @@ Namen zijn standaard weggelaten uit het rapport. Voeg `--include-names` alleen t
 python migrate_ids.py --data-dir "<datastore>" --proposal-output "<private reviewmap>\manillen-id-proposal.json"
 ```
 
-Het voorstel bevat namen en is dus privé. Het commando weigert de actieve datastore als uitvoerlocatie, overschrijft geen bestaand voorstel en verandert geen bronbestanden. Het voorstel blijft `pending`; niet-poolspelers en locaties krijgen geen automatische actieve status. Er is nog geen apply-, activatie- of rollbackcommando; gebruik de JSON niet als goedgekeurde migratie.
+Het voorstel bevat namen en is dus privé. Het commando weigert de actieve datastore als uitvoerlocatie, overschrijft geen bestaand voorstel en verandert geen bronbestanden. Het voorstel blijft `pending`; niet-poolspelers en locaties krijgen geen automatische actieve status.
+
+Na een private mappingreview kan een stagingversie worden gebouwd. De reviewer moet in het voorstel alle `Active`- en `PoolMember`-statussen invullen en een aparte approval-JSON maken die exact de hash van dat voorstel noemt:
+
+```json
+{
+  "status": "approved",
+  "proposal_sha256": "<proposal_sha256 uit het reviewed voorstel>",
+  "approved_by": "<reviewer>",
+  "approved_at": "2026-11-04T12:00:00+01:00"
+}
+```
+
+De hash in het voorstel moet overeenkomen met de inhoud; iedere wijziging aan het voorstel maakt de bestaande hash ongeldig. Bewaar het reviewed voorstel als een nieuwe privé-kopie en bereken daarna de hash opnieuw:
+
+```powershell
+python -c "import json; from pathlib import Path; from migrate_ids import calculate_proposal_hash; s=Path(r'<original proposal.json>'); p=Path(r'<new reviewed proposal.json>'); d=json.loads(s.read_text(encoding='utf-8')); d['proposal_sha256']=calculate_proposal_hash(d); p.open('x', encoding='utf-8').write(json.dumps(d, ensure_ascii=False, indent=2)+'\n')"
+```
+
+Maak vervolgens de approval-JSON met deze nieuwe hash. Bewaar voorstel, approval en staging buiten de repository en de datastore. De stagingopdracht weigert een pending, gewijzigd of verouderd voorstel, overschrijft geen bestaande uitvoermap en activeert de data niet:
+
+```powershell
+python stage_ids.py --data-dir "<tijdelijke datastore>" `
+  --proposal "<private reviewmap>\proposal.json" `
+  --approval "<private reviewmap>\approval.json" `
+  --staging-output "<private stagingmap>"
+```
+
+Dit is alleen een stagingtransformatie; er is nog geen backup-, apply-, activatie- of rollbackcommando. Gebruik geen repository- of NAS-data voor deze testfase.
 
 ## Statische mirror-preview (preview live; productiecutover open)
 

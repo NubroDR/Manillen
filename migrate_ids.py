@@ -151,6 +151,17 @@ def _review_summary(report):
     }
 
 
+def calculate_proposal_hash(proposal):
+    """Return the integrity hash for proposal content, excluding its hash field."""
+    unsigned_proposal = {
+        key: value for key, value in proposal.items() if key != "proposal_sha256"
+    }
+    canonical = json.dumps(
+        unsigned_proposal, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
 def build_id_proposal(data_dir=DATA_DIR, repo_root=None):
     """Return a review proposal without changing the source datastore."""
     data_dir = Path(data_dir).resolve()
@@ -205,10 +216,7 @@ def build_id_proposal(data_dir=DATA_DIR, repo_root=None):
             "note": "Review privately; no apply command exists yet.",
         },
     }
-    canonical = json.dumps(
-        proposal, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-    ).encode("utf-8")
-    proposal["proposal_sha256"] = hashlib.sha256(canonical).hexdigest()
+    proposal["proposal_sha256"] = calculate_proposal_hash(proposal)
     return proposal
 
 

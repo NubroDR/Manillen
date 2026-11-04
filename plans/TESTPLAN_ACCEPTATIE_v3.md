@@ -67,7 +67,16 @@
 - `profile_data.py` meldt aliassen die na hoofdletter-/spatie-normalisatie naar meerdere ID's wijzen; de standaardrapportage geeft de aliassleutel en doel-ID's niet prijs.
 - Tests op tijdelijke fixtures bevestigen de ID-prefixen/alfabetten, collision retry, poolstatus, reserve-placeholders, handmatige statusreview voor niet-poolspelers en locaties, weigeren van output in de datastore en weigeren van overschrijven. De hashcontrole omvat ook bestaande scorebladbestanden en de geneste `Scorebladen/`-map.
 - `tests/test_migrate_ids.py` en `tests/test_profile_data.py`: `13 passed`. Geen echte of NAS-data gebruikt.
-- **Open:** F3-08 t/m F3-38 en resterende alias-/referentiële validatie, inclusief expliciete mappinggoedkeuring, versioned staging, validatie, backup en atomische activatie/rollback. Het huidige voorstel mag niet worden toegepast.
+- **Open bij voorstel:** F3-08 t/m F3-19 en F3-20 t/m F3-22, F3-25 t/m F3-39. De basisstaging en validatie zijn op tijdelijke fixtures gecontroleerd, maar backup, procesonderbreking, active-manifest, activatie, data-path-resolutie en rollback ontbreken. Het voorstel mag niet op actieve data worden toegepast.
+
+### Voortgang Fase 3: inactieve staging (2026-11-04)
+
+- `stage_ids.py` transformeert uitsluitend een voorstel waarvan de inhoudshash geldig is, de bronbestanden nog dezelfde hashes hebben en een aparte approval-JSON exact naar die voorstelhash verwijst. Handmatige `Active`-/`PoolMember`-statussen zijn verplicht.
+- Staging wordt naar een nieuwe directory buiten datastore en repository geschreven via een tijdelijke sibling-map en rename. De uitvoer bevat de negen geversioneerde CSV's plus een privé manifest; actieve bronbestanden, legacybronnen, `Scorebladen.xlsx` en `Scorebladen/` blijven onaangeroerd.
+- Validatie controleert schemas, ID-/aliasreferenties, reserve-slots, scores, rij-aantallen en partnercount-baseline. Er is geen backup-, apply-, manifestactivatie- of rollbackroute; geen echte datastore gebruikt.
+- `tests/test_stage_ids.py`, `tests/test_migrate_ids.py` en `tests/test_profile_data.py`: gericht geslaagd (`17 passed`).
+- **Validatie:** de gerichte tests slaagden (`17 passed`) en de volledige regressiesuite slaagde (`70 passed`).
+- **Nog open:** versioned active-manifest en `data_paths.py`, procesonderbreking, backup en atomische activatie uitsluitend op tijdelijke fixtures.
 
 ### Mobiele UI-feedback (2026-11-04)
 
