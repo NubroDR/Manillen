@@ -46,6 +46,13 @@
 - Lokale browsercontrole op een geïsoleerde fixture: vier verticale spelersrijen met W-L, geen matchups/scores in Speeldagen, en detailmatchup plus ruwe scores zichtbaar op Scores. Geen pagina-overflow op 360, 375, 390, 768, 1024 en 1440 px; mobiel stapelt de tafels en desktop toont de bestaande auto-grid. De browser heeft fixture-JSON gebruikt; er is niet gepubliceerd naar de preview.
 - Validatie: `tests/test_static_snapshot.py` geslaagd (`13 passed`) en de volledige regressiesuite geslaagd (`53 passed`). F2-43 t/m F2-45 zijn lokaal geverifieerd; de overige Fase 2-tests blijven open.
 
+### Mobiele UI-feedback (2026-11-04)
+
+- Donkere modus gebruikt nu ook een donkere achtergrondgloed in plaats van de lichte decoratieve cirkel. Mobiele tabellen blijven semantische tabellen in een eigen horizontaal scrollgebied met zichtbare kolomkoppen en een vaste eerste kolom; de kaartweergave is verwijderd voor Tussenstand, Seizoenen, Scores en Parenhistoriek.
+- Tussenstand en Scores bieden geen filteroptie "Alle seizoenen"; oude `seizoen=all`-links vallen terug op het actieve seizoen. Seizoenen toont één overzichtsrij per seizoen met een link naar het Speeldagen-tabblad wanneer detaildagen beschikbaar zijn; legacy-seizoenen zonder die details tonen geen link. Tafelspelers in Speeldagen staan op W-L (wins, daarna games, daarna naam), zonder puntenverschil als tie-break.
+- `tests/test_static_snapshot.py` en de volledige pytest-suite slagen (`13 passed`, respectievelijk `53 passed`); de snapshottest bevestigt ook W-L-sortering zonder saldo-tie-break. Browseracceptatie van deze feedback kon lokaal niet worden afgerond: de geïntegreerde browser kreeg herhaaldelijk connection resets bij de lokale fixtureserver; er is geen previewdeploy uitgevoerd. Productie en preview blijven ongewijzigd.
+- Aanvullende feedback op Seizoenen: verwijderd zijn de spelers- en lange speeldagenkolommen; er is nu één rij per seizoen met een directe link naar het juiste Speeldagen-seizoen indien die weergave details heeft.
+
 ## 1. Legenda
 
 | Code | Betekenis |

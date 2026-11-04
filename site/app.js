@@ -66,7 +66,12 @@ function table(headers, rows, className = "data-table", rowClasses = [], headerC
     body.append(row);
   }
   root.append(head, body);
-  return root;
+  const scrollRegion = element("div", undefined, "table-scroll");
+  scrollRegion.setAttribute("role", "region");
+  scrollRegion.setAttribute("aria-label", "Tabel, horizontaal verschuifbaar");
+  scrollRegion.tabIndex = 0;
+  scrollRegion.append(root);
+  return scrollRegion;
 }
 
 function emptyState(message) {
@@ -185,9 +190,9 @@ function seasonOptions(includeAll = true) {
   return options;
 }
 
-function chosenSeason(params) {
+function chosenSeason(params, includeAll = true) {
   const selected = params.get("seizoen");
-  return selected && (selected === "all" || manifest.seasons.some(
+  return selected && ((includeAll && selected === "all") || manifest.seasons.some(
     (season) => season.season === selected,
   ))
     ? selected
@@ -242,7 +247,7 @@ function loadTheme() {
 }
 
 function standingsView(data, route, params) {
-  const currentSeason = chosenSeason(params);
+  const currentSeason = chosenSeason(params, false);
   const selectedDate = params.get("datum") || "";
   const dateOptions = [["", "Alle speeldagen"]];
   for (const day of data.playdays) dateOptions.push([day.date, day.date]);
@@ -250,7 +255,7 @@ function standingsView(data, route, params) {
     ? selectedDate
     : "";
   elements.controls.replaceChildren(
-    selectControl("Seizoen", "seizoen", seasonOptions(), currentSeason, (value) => {
+    selectControl("Seizoen", "seizoen", seasonOptions(false), currentSeason, (value) => {
       updateFilter("seizoen", value, route, params);
     }),
     selectControl(
@@ -316,13 +321,8 @@ function playdaysView(data, route, params) {
       tableCard.append(element("h3", `Tafel ${tableData.table}`));
       const names = element("ul", undefined, "player-list");
       names.setAttribute("aria-label", "W-L-resultaten per speler");
-      const standingsByPlayer = new Map(
-        tableData.standings.map((standing) => [standing.player, standing]),
-      );
-      for (const player of tableData.players) {
-        const standing = standingsByPlayer.get(player);
-        const wins = standing?.wins ?? 0;
-        const losses = standing?.losses ?? 0;
+      for (const standing of tableData.standings) {
+        const { player, wins, losses } = standing;
         const row = element("li", undefined, "player-result-row");
         row.append(element("span", player, "player-result-name"));
         const result = element("strong", `${wins}-${losses}`, "player-result-record");
@@ -339,7 +339,7 @@ function playdaysView(data, route, params) {
 }
 
 function scoresView(data, route, params) {
-  const selectedSeason = chosenSeason(params);
+  const selectedSeason = chosenSeason(params, false);
   const selectedDate = params.get("datum") || "";
   const playerQuery = params.get("speler") || "";
   const dates = [["", "Alle speeldagen"], ...data.playdays.map((day) => [day.date, day.date])];
@@ -350,7 +350,7 @@ function scoresView(data, route, params) {
     results.replaceChildren(scoresTable(data, validDate, value));
   });
   elements.controls.replaceChildren(
-    selectControl("Seizoen", "seizoen", seasonOptions(), selectedSeason, (value) => {
+    selectControl("Seizoen", "seizoen", seasonOptions(false), selectedSeason, (value) => {
       updateFilter("seizoen", value, route, params);
     }),
     selectControl(
@@ -421,16 +421,24 @@ function pairingsTable(playerQuery) {
 
 function seasonsView(seasonData) {
   elements.controls.replaceChildren();
-  const rows = seasonData
-    .sort((left, right) => right.seasonNumber - left.seasonNumber)
+  const rows = [...seasonData]
+    .sort(
+      (left, right) => right.seasonNumber - left.seasonNumber,
+    )
     .map((season) => {
       const item = manifest.seasons.find((row) => row.season === season.season);
-      const playdays = season?.playdays.length
-        ? season.playdays.map((day) => `${day.date}${day.location ? ` · ${day.location}` : ""}`).join(" / ")
-        : season?.legacyPlaydays.map((day) => `${day.date}${day.location ? ` · ${day.location}` : ""}`).join(" / ") || "—";
-      const attendeeCounts = season.playdays.length
-        ? season.playdays.map((day) => day.playersPresent)
-        : season.legacyPlaydays.map((day) => day.playersPresent);
+      const playdayCell = cell("Speeldagen", "—");
+      if (season.playdays.length) {
+        const label = season.playdays.length === 1
+          ? "Bekijk 1 speeldag"
+          : `Bekijk ${season.playdays.length} speeldagen`;
+        const link = element("a", label);
+        link.href = routeHash(
+          "speeldagen",
+          new URLSearchParams({ seizoen: season.season }),
+        );
+        playdayCell.replaceChildren(link);
+      }
       return [
         cell("Seizoen", `S${item?.seasonNumber ?? season.seasonNumber}`),
         cell("Label", season.season),
@@ -439,13 +447,12 @@ function seasonsView(seasonData) {
         cell("🥈 Zilver", season.awards.Silver || "—", "rank-silver"),
         cell("🥉 Brons", season.awards.Bronze || "—", "rank-bronze"),
         cell("🏮 Rode lantaarn", season.awards.RedLantern || "—", "rank-lantern"),
-        cell("Spelers", attendeeCounts.length ? attendeeCounts.join(" / ") : "—"),
-        cell("Speeldagen", playdays),
+        playdayCell,
       ];
     });
   if (!rows.length) return emptyState("Nog geen seizoenen gevonden.");
   return table(
-    ["Seizoen", "Label", "Pool", "🥇 Goud", "🥈 Zilver", "🥉 Brons", "🏮 Rode lantaarn", "Spelers", "Speeldagen"],
+    ["Seizoen", "Label", "Pool", "🥇 Goud", "🥈 Zilver", "🥉 Brons", "🏮 Rode lantaarn", "Speeldagen"],
     rows,
     "data-table",
     [],
@@ -504,7 +511,10 @@ async function renderRoute() {
       setContent(pairingsView(routeKey, params));
       return;
     }
-    const selectedSeason = chosenSeason(params);
+    const selectedSeason = chosenSeason(
+      params,
+      route !== "tussenstand" && route !== "scores",
+    );
     if (selectedSeason !== params.get("seizoen")) {
       params.set("seizoen", selectedSeason);
       window.history.replaceState(null, "", routeHash(routeKey, params));

@@ -305,6 +305,9 @@ def test_playday_table_standings_are_scoped_and_scores_stay_in_scores_view(tmp_p
 
     assert table_one["An"] == (2, 1)
     assert table_two["An"] == (0, 3)
+    assert [row["player"] for row in tables[1]["standings"]] == [
+        "An", "Bruno", "Freddy", "Etienne",
+    ]
     assert all("scores" not in table for table in tables.values())
     assert len(files["seasons/2025-2026.json"]["scores"]) == 6
 

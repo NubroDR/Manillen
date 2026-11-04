@@ -43,15 +43,27 @@ def _standings_rows(rows):
     ]
 
 
-def _table_standings_rows(rows):
-    return [
-        {
+def _table_standings_rows(rows, players):
+    results = {
+        row["player"].removesuffix("*"): {
             "player": row["player"].removesuffix("*"),
             "wins": row["wins"],
             "losses": row["games_played"] - row["wins"],
         }
         for row in rows
+    }
+    standings = [
+        results.get(player, {"player": player, "wins": 0, "losses": 0})
+        for player in players
     ]
+    return sorted(
+        standings,
+        key=lambda row: (
+            -row["wins"],
+            -(row["wins"] + row["losses"]),
+            row["player"].casefold(),
+        ),
+    )
 
 
 def _resolved_team_players(value, assignments):
@@ -109,7 +121,7 @@ def _season_snapshot(
                 "table": record["Table"],
                 "players": players,
                 "location": record["Location"],
-                "standings": _table_standings_rows(table_standings),
+                "standings": _table_standings_rows(table_standings, players),
             })
         location = next(
             (record["Location"] for record in table_records if record["Location"]),
