@@ -1,11 +1,14 @@
 # Implementatieplan v3: snelle statische mirror, Speeldagen, ID's en spelersprofielen
 
-**Status:** implementatie gestart — Fase 0 en Fase 1 niet volledig afgerond; statische preview live; Speeldagen-W-L, mobiele UI-feedback en gelijke-scorevalidatie lokaal getest; overige Fase 2-acceptatie en previewreview open
+**Status:** implementatie gestart — Fase 0 en Fase 1 niet volledig afgerond; Amsterdamse gepasseerd-status en middernachttimer voor Speeldagen gecontroleerd; F2-24 en overige Fase 2-acceptatie nog open; timer- en faviconwijzigingen worden op de preview uitgerold
 **Scope:** publieke read-only mirror (herbouw als statische site), gedeelde berekeningen, centrale referentiedata, Speeldagen-rangschikking, spelersprofielen en mobile-first ontwerp.  
 **Belangrijke randvoorwaarde:** bestaande gebruikersdata in `data/` blijft onaangeroerd totdat een migratie expliciet is goedgekeurd, geback-upt en geverifieerd.
 
 ### Overdracht voor volgende sessie (2026-11-04)
 
+- **Aanvulling:** de Speeldagen-timer berekent nu de eerstvolgende lokale middernacht in plaats van periodiek te pollen. Op de live preview bleef W-L 1 ms voor middernacht verborgen, verscheen op exact middernacht de melding voor vandaag en kwam W-L zonder handmatige refresh na de volgende middernacht terug. De berekening gaf ook de juiste UTC-middernacht rond beide DST-wissels; F2-24 (andere browsertijdzones) blijft open. De nieuwe statische previewbundel bevat ook een eigen SVG-favicon. Productie-`docs/` blijft onaangeroerd; de productiepagina heeft al een bestaand favicon.
+- **Previewdeploy geslaagd:** commit `5734751` / Pages-run `41812316286`. De live previewlinkt het SVG-favicon correct en serveert het met `image/svg+xml` en HTTP 200; de productie-`favicon.ico` antwoordt ook met HTTP 200.
+- **Validatie aanvulling:** volledige pytest-suite `58 passed`; na toevoeging van de favicon slaagden de gerichte statische-buildtests `15 passed`.
 - **Lokale browseracceptatie afgerond (2026-11-04):** per tafel staan de spelers verticaal met hun W-L-resultaat; Speeldagen bevat geen matchups of ruwe scores meer en Scores behoudt de volledige uitslagen. Alle zes routes zijn op 360, 375, 390, 768, 1024 en 1440 px gecontroleerd, plus landscape op 844×390; er was geen pagina-overflow of JavaScript-/consolefout. Themawissel en -persistentie, menu sluiten met Escape en focusherstel zijn gecontroleerd. De volledige pytest-suite slaagde (`53 passed`).
 - **Previewdeploy geslaagd (2026-11-04):** commit `0fc9093` in `NubroDR/manillen-preview`, Pages-run `41803098506`. De build is uitsluitend uit de bestaande publieke `mirror_app/data`-snapshot gemaakt. De gepubliceerde JSON heeft W-L per tafel en geen gedupliceerde scores; de live browser toonde de spelersrijen in Speeldagen en de volledige matchups/scores in Scores. De preview is beschikbaar voor gebruikersreview; productie is niet gewijzigd.
 - De desktop-grid staat al live in de aparte preview: commit `30d631f` / Pages-run `40219277473`. Vier tafels naast elkaar op 1440 px, drie op 1024 px; op 900 px en smaller gestapeld. Productie-URL `/Manillen/` en hoofdrepo-`docs/` zijn niet aangepast.

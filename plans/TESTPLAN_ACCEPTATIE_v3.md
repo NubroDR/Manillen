@@ -53,6 +53,14 @@
 - Regressies voor opslag-immutabiliteit, klassementen en snapshotmarkering slagen. De volledige pytest-suite slaagde (`57 passed`); op een geïsoleerde fixture was de markering in de browser zichtbaar op 360, 390, 768 en 1440 px zonder pagina-overflow of JavaScriptfouten.
 - De overige Fase 2-tests en previewreview blijven open; Fase 2 is hiermee niet als geheel geaccepteerd.
 
+### Voortgang gepasseerd-status Speeldagen (2026-11-04)
+
+- Speeldagen toont geen W-L-uitslagen op de speeldag zelf of op toekomstige speeldagen; de spelerslijst blijft zichtbaar met een melding. Na afloop in `Europe/Amsterdam` worden de W-L-resultaten getoond. Speeldagen zonder scores blijven herkenbaar als "Nog geen scores".
+- De status wordt bij een Amsterdamse datumwissel opnieuw gerenderd zolang Speeldagen openstaat.
+- Met een bevroren browserklok is op de live preview een speeldag op de volgende Amsterdamse datum 1 ms voor middernacht zonder W-L getoond, op exact 00:00 nog zonder W-L met de melding voor vandaag, en na de volgende middernacht mét W-L. De view ververst zonder handmatige refresh; hiermee zijn F2-20 t/m F2-23 getest.
+- De timer plant nu de eerstvolgende Amsterdamse middernacht in plaats van elke 30 seconden te pollen. De geplande UTC-tijdstippen rond zowel de zomer- als wintertijdwissel van 2026 zijn gecontroleerd (F2-25).
+- Alternatieve browsertijdzones (F2-24) zijn nog niet getest: de browseromgeving stond niet toe extra tijdzonecontexten te openen. De datum- en timerberekening gebruiken expliciet `Europe/Amsterdam`.
+
 ### Mobiele UI-feedback (2026-11-04)
 
 - Donkere modus gebruikt nu ook een donkere achtergrondgloed in plaats van de lichte decoratieve cirkel. Mobiele tabellen blijven semantische tabellen in een eigen horizontaal scrollgebied met zichtbare kolomkoppen en een vaste eerste kolom; de kaartweergave is verwijderd voor Tussenstand, Seizoenen, Scores en Parenhistoriek.

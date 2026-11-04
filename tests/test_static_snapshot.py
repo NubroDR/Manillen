@@ -507,18 +507,27 @@ def test_static_site_build_contains_only_derived_json_and_site_assets(tmp_path):
         "styles.css",
         "app.js",
         "service-worker-cleanup.js",
+        "favicon.svg",
         "data/manifest.json",
         "data/players.json",
     } <= files
     assert all(path.endswith(".json") or path in {
         "index.html", "styles.css", "app.js", "service-worker-cleanup.js",
+        "favicon.svg",
     } for path in files)
     assert not any(path.endswith(".csv") for path in files)
     index = (output / "index.html").read_text(encoding="utf-8")
     assert '<meta name="robots" content="noindex">' in index
+    assert '<link rel="icon" href="./favicon.svg" type="image/svg+xml">' in index
     site_assets = Path(__file__).resolve().parents[1] / "site"
     asset_digest = hashlib.sha256()
-    for filename in ("index.html", "styles.css", "app.js", "service-worker-cleanup.js"):
+    for filename in (
+        "index.html",
+        "styles.css",
+        "app.js",
+        "service-worker-cleanup.js",
+        "favicon.svg",
+    ):
         asset_digest.update(filename.encode("utf-8"))
         asset_digest.update(b"\0")
         asset_digest.update((site_assets / filename).read_bytes())
@@ -527,7 +536,13 @@ def test_static_site_build_contains_only_derived_json_and_site_assets(tmp_path):
     assert f"styles.css?v={manifest['buildId']}-{asset_id}" in index
     assert f"service-worker-cleanup.js?v={manifest['buildId']}-{asset_id}" in index
     assert f"app.js?v={manifest['buildId']}-{asset_id}" in index
-    for filename in ("index.html", "styles.css", "app.js", "service-worker-cleanup.js"):
+    for filename in (
+        "index.html",
+        "styles.css",
+        "app.js",
+        "service-worker-cleanup.js",
+        "favicon.svg",
+    ):
         assert b"\r\n" not in (output / filename).read_bytes()
     cleanup_script = (output / "service-worker-cleanup.js").read_text(encoding="utf-8")
     assert 'key.endsWith(cacheSuffix)' in cleanup_script
@@ -581,10 +596,12 @@ def test_snapshot_archive_builds_a_json_only_site(tmp_path):
         "styles.css",
         "app.js",
         "service-worker-cleanup.js",
+        "favicon.svg",
         "data/manifest.json",
     } <= files
     assert all(path.endswith(".json") or path in {
         "index.html", "styles.css", "app.js", "service-worker-cleanup.js",
+        "favicon.svg",
     } for path in files)
     assert tree_hash(data_dir) == before
 
@@ -741,6 +758,7 @@ def test_frontend_uses_safe_text_rendering_and_mobile_accessible_controls():
     app = (root / "site" / "app.js").read_text(encoding="utf-8")
 
     assert '<meta name="robots" content="noindex">' in index
+    assert '<link rel="icon" href="./favicon.svg" type="image/svg+xml">' in index
     assert 'viewport-fit=cover' in index
     assert all(f'data-route="{route}"' in index for route in (
         "seizoenen",

@@ -78,6 +78,81 @@ function emptyState(message) {
   return element("p", message, "empty-state");
 }
 
+function amsterdamDate(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Amsterdam",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const dateParts = Object.fromEntries(
+    parts.map(({ type, value }) => [type, value]),
+  );
+  return `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
+}
+
+function playdayHasPassed(playDate, now = new Date()) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(playDate)
+    && playDate < amsterdamDate(now);
+}
+
+function nextAmsterdamMidnight(now = new Date()) {
+  const [year, month, day] = amsterdamDate(now).split("-").map(Number);
+  const nextDate = new Date(Date.UTC(year, month - 1, day + 1));
+  const target = {
+    year: nextDate.getUTCFullYear(),
+    month: nextDate.getUTCMonth() + 1,
+    day: nextDate.getUTCDate(),
+  };
+  const desiredUtc = Date.UTC(target.year, target.month - 1, target.day);
+  let timestamp = desiredUtc;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Amsterdam",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(new Date(timestamp));
+    const localParts = Object.fromEntries(
+      parts.map(({ type, value }) => [type, Number(value)]),
+    );
+    const localAsUtc = Date.UTC(
+      localParts.year,
+      localParts.month - 1,
+      localParts.day,
+      localParts.hour,
+      localParts.minute,
+      localParts.second,
+    );
+    const adjustment = desiredUtc - localAsUtc;
+    timestamp += adjustment;
+    if (adjustment === 0) break;
+  }
+  return new Date(timestamp);
+}
+
+let observedAmsterdamDate = amsterdamDate();
+function scheduleAmsterdamDateRefresh() {
+  const delay = Math.max(
+    0,
+    nextAmsterdamMidnight().getTime() - Date.now(),
+  );
+  window.setTimeout(() => {
+    const currentDate = amsterdamDate();
+    if (currentDate !== observedAmsterdamDate) {
+      observedAmsterdamDate = currentDate;
+      if (routeFromHash().route === "speeldagen") renderRoute();
+    }
+    scheduleAmsterdamDateRefresh();
+  }, delay);
+}
+scheduleAmsterdamDateRefresh();
+
 function setContent(node) {
   elements.content.replaceChildren(node);
   elements.content.setAttribute("aria-busy", "false");
@@ -310,6 +385,7 @@ function playdaysView(data, route, params) {
   if (!data.playdays.length) return emptyState("Nog geen speeldagen gevonden.");
   const fragment = document.createDocumentFragment();
   for (const day of data.playdays) {
+    const showResults = playdayHasPassed(day.date);
     const card = element("section", undefined, "day-card");
     const title = element("h3", day.date);
     if (day.location) {
@@ -320,6 +396,27 @@ function playdaysView(data, route, params) {
       const tableCard = element("section", undefined, "table-card");
       tableCard.append(element("h3", `Tafel ${tableData.table}`));
       const names = element("ul", undefined, "player-list");
+      const hasResults = tableData.standings.some(
+        ({ wins, losses }) => wins + losses > 0,
+      );
+      if (!showResults || !hasResults) {
+        names.setAttribute("aria-label", "Spelers aan tafel");
+        for (const player of tableData.players) {
+          const row = element("li", undefined, "player-result-row");
+          row.append(element("span", player, "player-result-name"));
+          names.append(row);
+        }
+        tableCard.append(names);
+        tableCard.append(emptyState(
+          showResults
+            ? "Nog geen scores voor deze tafel."
+            : day.date === amsterdamDate()
+              ? "W-L-resultaten verschijnen na afloop van vandaag."
+              : "W-L-resultaten verschijnen na afloop van de speeldag.",
+        ));
+        card.append(tableCard);
+        continue;
+      }
       names.setAttribute("aria-label", "W-L-resultaten per speler");
       for (const standing of tableData.standings) {
         const { player, wins, losses } = standing;

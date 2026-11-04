@@ -19,6 +19,7 @@ SITE_ASSETS = (
     "styles.css",
     "app.js",
     "service-worker-cleanup.js",
+    "favicon.svg",
 )
 MANIFEST_FIELDS = {
     "schemaVersion",
