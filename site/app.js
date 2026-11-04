@@ -27,6 +27,7 @@ let manifest;
 let players = [];
 let pairings = [];
 let hallOfFame = [];
+let playerRoutes = {};
 const seasonCache = new Map();
 let activeRender = 0;
 
@@ -54,6 +55,7 @@ function playerSlug(name) {
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("nl")
+    .replace(/&/g, " and ")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "") || "speler";
 }
@@ -64,7 +66,9 @@ function profileAction(name, className = "player-profile-action") {
     return element("span", "", className + " is-hidden");
   }
   const link = element("a", "👤", className);
-  link.href = `#/speler/${playerSlug(display)}`;
+  const slug = playerSlug(display);
+  const profileRoute = playerRoutes[slug] || slug;
+  link.href = `#/speler/${encodeURIComponent(profileRoute)}`;
   link.setAttribute("aria-label", `Open profiel van ${display}`);
   link.title = `Open profiel van ${display}`;
   return link;
@@ -665,10 +669,10 @@ function hallOfFameView() {
 }
 
 async function loadPlayerProfile(slug) {
-  const safeSlug = String(slug || "").trim();
-  if (!safeSlug) return null;
+  const safeRoute = String(slug || "").trim();
+  if (!/^(?:plr_[a-z0-9]{5}|[a-z0-9-]+)$/i.test(safeRoute)) return null;
   try {
-    return await fetchJson(`players/${safeSlug}.json`);
+    return await fetchJson(`players/${safeRoute}.json`);
   } catch (error) {
     console.warn("Spelersprofiel niet beschikbaar", error);
     return null;
@@ -816,6 +820,29 @@ async function start() {
     manifest = await response.json();
     if (!manifest.buildId || !manifest.activeSeason || !Array.isArray(manifest.seasons)) {
       throw new Error("Het snapshotmanifest heeft een ongeldig schema.");
+    }
+    const routesResponse = await fetch(
+      `./data/player-routes.json?v=${encodeURIComponent(manifest.buildId)}`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (routesResponse.status !== 404) {
+      if (!routesResponse.ok) {
+        throw new Error("De spelerprofielroutes konden niet worden geladen.");
+      }
+      const routes = await routesResponse.json();
+      if (
+        !routes
+        || typeof routes !== "object"
+        || Array.isArray(routes)
+        || Object.entries(routes).some(([slug, route]) => (
+          !/^[a-z0-9-]+$/i.test(slug)
+          || typeof route !== "string"
+          || !/^(?:plr_[a-z0-9]{5}|[a-z0-9-]+)$/i.test(route)
+        ))
+      ) {
+        throw new Error("De spelerprofielroutes hebben een ongeldig schema.");
+      }
+      playerRoutes = routes;
     }
     elements.build.textContent = `Snapshot ${manifest.buildId}`;
     if (!window.location.hash) {

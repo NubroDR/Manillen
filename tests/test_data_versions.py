@@ -121,7 +121,14 @@ def test_activation_backs_up_before_atomic_switch_and_snapshot_uses_active_versi
     assert manifest["activeSeason"] == "2025-2026"
     assert files["players.json"] == ["Alice", "Bob"]
     assert files["seasons/2025-2026.json"]["playdays"][0]["location"] == "Hall"
-    serialized = json.dumps(files, ensure_ascii=False)
+    alice_route = files["player-routes.json"]["alice"]
+    assert alice_route.startswith("plr_")
+    assert files[f"players/{alice_route}.json"]["name"] == "Alice"
+    serialized = json.dumps({
+        path: payload
+        for path, payload in files.items()
+        if path != "player-routes.json" and not path.startswith("players/plr_")
+    }, ensure_ascii=False)
     assert "plr_" not in serialized
     assert "loc_" not in serialized
 

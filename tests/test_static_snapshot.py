@@ -429,7 +429,20 @@ def test_snapshot_matches_legacy_output_after_id_version_activation(tmp_path):
     id_manifest, id_files = build_snapshot(data_dir)
 
     assert id_manifest == legacy_manifest
-    assert id_files == legacy_files
+    assert {
+        path: payload
+        for path, payload in id_files.items()
+        if path != "player-routes.json" and not path.startswith("players/plr_")
+    } == {
+        path: payload
+        for path, payload in legacy_files.items()
+        if path != "player-routes.json"
+    }
+    assert id_files["player-routes.json"]["an"].startswith("plr_")
+    assert id_files["player-routes.json"]["freddy"].startswith("plr_")
+    for slug, route in id_files["player-routes.json"].items():
+        if route.startswith("plr_"):
+            assert id_files[f"players/{route}.json"] == id_files[f"players/{slug}.json"]
 
 
 def test_snapshot_is_deterministic_json_only_and_never_changes_source(tmp_path):

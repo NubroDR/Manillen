@@ -22,6 +22,7 @@ from manillen_core.score_helpers import (
     load_scores,
 )
 from manillen_core.reference_adapter import ReferenceAdapter
+from manillen_core.reference_helpers import is_reserve_reference
 from manillen_core.season_helpers import (
     MIN_GAMES_FOR_AWARD,
     compute_closed_season_awards,
@@ -470,46 +471,120 @@ def build_snapshot(data_dir):
     all_season_payload["awards"] = {
         field: "" for field in ("Gold", "Silver", "Bronze", "RedLantern")
     }
+    profile_names = set(players)
+    profile_names.update(row["Player"] for row in hall_of_fame)
+    profile_names.update(
+        player for row in all_history for player in row["Players"]
+    )
+    profile_names.update(
+        player
+        for row in all_scores
+        for team in (row["Team1Players"], row["Team2Players"])
+        for player in _team_players(team)
+    )
+    profile_names.update(
+        player
+        for row in partner_rows
+        for player in (row["player1"], row["player2"])
+    )
     files = {
         "players.json": players,
         "pairings.json": partner_rows,
         "hall-of-fame.json": hall_of_fame,
     }
     profiles_by_id = {}
+    profile_routes = {}
     profile_slugs = {}
-    for player in players:
-        player_id = adapter.player_id(player)
-        profile_path = _player_slug(player)
-        existing_id = profile_slugs.get(profile_path)
-        if existing_id is not None and existing_id != player_id:
-            raise ValueError(f"Player profile slug collision: {profile_path}")
-        profile_slugs[profile_path] = player_id
-        profiles_by_id[player_id] = _player_profile(
-            player,
-            season_by_date,
-            hall_of_fame,
-            all_scores,
-            all_history,
-            assignments,
+    for player in sorted(profile_names, key=str.casefold):
+        if is_reserve_reference(player):
+            continue
+        player_id = adapter.find_player_id(player)
+        canonical_name = (
+            adapter.player_name(player_id) if player_id is not None else player
         )
-        files[f"players/{profile_path}.json"] = profiles_by_id[player_id]
+        profile_path = _player_slug(canonical_name)
+        profile_key = (
+            ("id", player_id)
+            if player_id is not None
+            else ("name", canonical_name.casefold())
+        )
+        existing_key = profile_slugs.get(profile_path)
+        if existing_key is not None and existing_key != profile_key:
+            raise ValueError(f"Player profile slug collision: {profile_path}")
+        profile_slugs[profile_path] = profile_key
+        if player_id is not None:
+            profiles_by_id.setdefault(
+                player_id,
+                _player_profile(
+                    canonical_name,
+                    season_by_date,
+                    hall_of_fame,
+                    all_scores,
+                    all_history,
+                    assignments,
+                ),
+            )
+            profile = profiles_by_id[player_id]
+        else:
+            profile = _player_profile(
+                canonical_name,
+                season_by_date,
+                hall_of_fame,
+                all_scores,
+                all_history,
+                assignments,
+            )
+        route_key = (
+            player_id
+            if adapter.is_versioned and player_id is not None
+            else profile_path
+        )
+        profile_routes[profile_path] = route_key
+        files[f"players/{route_key}.json"] = profile
+        if route_key != profile_path:
+            files[f"players/{profile_path}.json"] = profile
+
     if adapter.is_versioned:
         aliases_path = adapter.data_dir / "player_aliases.csv"
         with aliases_path.open("r", encoding="utf-8-sig", newline="") as file:
             for row in csv.DictReader(file):
-                if row.get("Source") != "rename":
-                    continue
                 player_id = row["PlayerID"]
-                if player_id not in profiles_by_id:
-                    continue
+                profile = profiles_by_id.get(player_id)
+                if profile is None:
+                    canonical_name = adapter.player_name(player_id)
+                    profile = _player_profile(
+                        canonical_name,
+                        season_by_date,
+                        hall_of_fame,
+                        all_scores,
+                        all_history,
+                        assignments,
+                    )
+                    profiles_by_id[player_id] = profile
+                    files[f"players/{player_id}.json"] = profile
+                    canonical_slug = _player_slug(canonical_name)
+                    existing_key = profile_slugs.get(canonical_slug)
+                    if (
+                        existing_key is not None
+                        and existing_key != ("id", player_id)
+                    ):
+                        raise ValueError(
+                            f"Player profile slug collision: {canonical_slug}"
+                        )
+                    profile_slugs[canonical_slug] = ("id", player_id)
+                    profile_routes[canonical_slug] = player_id
+                    files[f"players/{canonical_slug}.json"] = profile
                 profile_path = _player_slug(row["Alias"])
-                existing_id = profile_slugs.get(profile_path)
-                if existing_id is not None and existing_id != player_id:
+                existing_key = profile_slugs.get(profile_path)
+                if existing_key is not None and existing_key != ("id", player_id):
                     raise ValueError(
                         f"Player profile slug collision: {profile_path}"
                     )
-                profile_slugs[profile_path] = player_id
-                files[f"players/{profile_path}.json"] = profiles_by_id[player_id]
+                profile_slugs[profile_path] = ("id", player_id)
+                profile_routes[profile_path] = player_id
+                files[f"players/{profile_path}.json"] = profile
+
+    files["player-routes.json"] = profile_routes
     for label, payload in season_payloads.items():
         files[f"seasons/{_season_key(label)}.json"] = payload
     files["seasons/all.json"] = all_season_payload

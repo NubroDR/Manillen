@@ -108,6 +108,17 @@ class ReferenceAdapter:
             raise ValueError(f"Unknown player name or alias: {value}")
         return player_id
 
+    def find_player_id(self, name):
+        """Return a known player's ID, or None for an unregistered historical name."""
+        value = str(name or "").strip()
+        if not value or self._reserve_reference(value):
+            return None
+        if not self.is_versioned:
+            return value
+        if value in self._player_names:
+            return value
+        return self._player_ids_by_name.get(normalize_reference_name(value))
+
     def player_name(self, reference):
         """Resolve a stored player ID or reserve token to a display label."""
         value = str(reference or "").strip()

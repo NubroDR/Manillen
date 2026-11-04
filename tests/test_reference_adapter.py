@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import zipfile
@@ -12,6 +13,7 @@ from pathlib import Path
 import pytest
 from openpyxl import Workbook, load_workbook
 
+from build_static_site import build_site_from_archive
 from data_paths import VERSIONED_FILES, active_data_dir
 from generate_static_snapshot import build_snapshot
 from github_publish import (
@@ -351,6 +353,54 @@ def test_versioned_score_and_reserve_assignment_round_trip_ids(tmp_path):
     assert by_player["An"]["wins"] == 1
 
 
+def test_versioned_reserve_assignment_rejects_unmapped_name_without_writing(
+    tmp_path,
+):
+    data_root = tmp_path / "store"
+    data_root.mkdir()
+    version_dir = _activate_version(data_root)
+    assignments_path = version_dir / "reserve_assignments.csv"
+    _write_csv(
+        version_dir / "pairings_history.csv",
+        VERSIONED_SCHEMAS["pairings_history.csv"],
+        [{
+            "Date": "2026-10-10",
+            "Table": "1",
+            "Players": "plr_abcde | plr_fghjk | plr_mnpqr | RESERVE:1",
+            "Season": "2026-2027",
+            "Location": "loc_abcde",
+        }],
+    )
+    _write_csv(
+        version_dir / "scores_history.csv",
+        VERSIONED_SCHEMAS["scores_history.csv"],
+        [{
+            "Date": "2026-10-10",
+            "Table": "1",
+            "Game": "1",
+            "Team1Players": "plr_abcde | plr_fghjk",
+            "Team2Players": "plr_mnpqr | RESERVE:1",
+            "Team1Score": "101",
+            "Team2Score": "20",
+        }],
+    )
+    save_reserve_assignments(
+        "2026-10-10",
+        {"Reserve 1": "Fred"},
+        assignments_path,
+    )
+    before = assignments_path.read_bytes()
+
+    with pytest.raises(ValueError, match="Unknown player name or alias"):
+        save_reserve_assignments(
+            "2026-10-10",
+            {"Reserve 1": "Unmapped guest"},
+            assignments_path,
+        )
+
+    assert assignments_path.read_bytes() == before
+
+
 def test_versioned_excel_export_shows_names_and_reserve_assignment(tmp_path):
     data_root = tmp_path / "store"
     data_root.mkdir()
@@ -386,6 +436,9 @@ def test_versioned_excel_export_shows_names_and_reserve_assignment(tmp_path):
         "José",
         "Frederik",
     ]
+    assert sheet["E19"].fill.fill_type == "solid"
+    assert sheet["E19"].fill.fgColor.rgb != sheet["E10"].fill.fgColor.rgb
+    assert sheet["E19"].font.color.rgb.endswith("806B1D")
 
 
 def test_versioned_snapshot_exports_display_names_not_ids(tmp_path):
@@ -432,7 +485,14 @@ def test_versioned_snapshot_exports_display_names_not_ids(tmp_path):
         "Fred*",
     ]
     assert season["scores"][0]["team2Players"] == "José | Fred*"
-    serialized = json.dumps(files, ensure_ascii=False)
+    assert files["player-routes.json"]["an"] == "plr_abcde"
+    assert files["player-routes.json"]["jose"] == "plr_mnpqr"
+    assert files["players/plr_abcde.json"] == files["players/an.json"]
+    serialized = json.dumps({
+        path: payload
+        for path, payload in files.items()
+        if path != "player-routes.json" and not path.startswith("players/plr_")
+    }, ensure_ascii=False)
     assert "plr_" not in serialized
     assert "loc_" not in serialized
     _, archive_bytes = _snapshot_archive_bytes(data_root)
@@ -444,8 +504,15 @@ def test_versioned_snapshot_exports_display_names_not_ids(tmp_path):
     assert "players.json" in archive_files
     assert all(
         "plr_" not in content and "loc_" not in content
-        for content in archive_files.values()
+        for path, content in archive_files.items()
+        if path != "player-routes.json"
     )
+    assert "player-routes.json" in archive_files
+    assert "plr_abcde" in archive_files["player-routes.json"]
+    site_output = tmp_path / "static-site"
+    build_site_from_archive(io.BytesIO(archive_bytes), site_output)
+    assert (site_output / "data" / "player-routes.json").is_file()
+    assert (site_output / "data" / "players" / "plr_abcde.json").is_file()
 
 
 def test_versioned_publisher_uploads_name_only_archive_before_dispatch(
@@ -483,14 +550,17 @@ def test_versioned_publisher_uploads_name_only_archive_before_dispatch(
         ) as archive:
             members = archive.namelist()
             assert all(member.endswith(".json") for member in members)
-            contents = [
-                archive.read(member).decode("utf-8")
+            contents = {
+                member: archive.read(member).decode("utf-8")
                 for member in members
-            ]
+            }
         assert all(
             "plr_" not in content and "loc_" not in content
-            for content in contents
+            for path, content in contents.items()
+            if path != "player-routes.json"
         )
+        assert "player-routes.json" in contents
+        assert "plr_abcde" in contents["player-routes.json"]
         return 201, {}
 
     class DispatchResponse:
@@ -570,6 +640,74 @@ def test_app_starts_with_active_id_version_and_displays_names(tmp_path):
     }
 
 
+def test_active_id_app_tab_markup_displays_names_without_reference_ids(tmp_path):
+    data_root = tmp_path / "store"
+    data_root.mkdir()
+    version_dir = _activate_version(data_root)
+    _write_csv(
+        version_dir / "pairings.csv",
+        VERSIONED_SCHEMAS["pairings.csv"],
+        [
+            {"Player1": "plr_abcde", "Player2": "plr_fghjk", "Count": "3"},
+            {"Player1": "plr_mnpqr", "Player2": "plr_stuvw", "Count": "1"},
+        ],
+    )
+    _write_csv(
+        version_dir / "scores_history.csv",
+        VERSIONED_SCHEMAS["scores_history.csv"],
+        [{
+            "Date": "2026-10-10",
+            "Table": "1",
+            "Game": "1",
+            "Team1Players": "plr_abcde | plr_fghjk",
+            "Team2Players": "plr_mnpqr | plr_stuvw",
+            "Team1Score": "101",
+            "Team2Score": "20",
+        }],
+    )
+    script = (
+        "import app, json; "
+        "views = {"
+        "'navigation': app.app_ui.render()['html'], "
+        "'history': app._history_cards().get_html_string(), "
+        "'seasons': app._seasons_overview().get_html_string(), "
+        "'hall_of_fame': app._hall_of_fame_table().get_html_string(), "
+        "'pairings': app._pairings_table().get_html_string(), "
+        "'score_entry': app._score_entry_tables('2026-10-10').get_html_string(), "
+        "'standings': app._standings_table(season='2026-2027').get_html_string()"
+        "}; print(json.dumps(views, ensure_ascii=False))"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=Path(__file__).resolve().parents[1],
+        env={
+            **os.environ,
+            "MANILLEN_DATA_DIR": str(data_root),
+            "PYTHONIOENCODING": "utf-8",
+        },
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    views = json.loads(result.stdout.strip().splitlines()[-1])
+
+    assert all(label in views["navigation"] for label in (
+        "Nieuwe speeldag",
+        "Scorebladen",
+        "Scores invoeren",
+        "Tussenstand",
+        "Speeldagen",
+        "Seizoenen",
+        "Hall of Fame",
+        "Paringen",
+    ))
+    combined_markup = "\n".join(views.values())
+    assert not re.search(r"\b(?:plr|loc)_[a-z0-9]{5}\b", combined_markup, re.I)
+    assert all(name in combined_markup for name in ("An", "Bruno", "José", "Fred", "Gent"))
+
+
 def test_offline_player_rename_preserves_id_history_excel_and_old_profile_url(
     tmp_path,
 ):
@@ -643,6 +781,9 @@ def test_offline_player_rename_preserves_id_history_excel_and_old_profile_url(
     assert before_snapshot["players/an.json"]["name"] == "An"
     assert renamed_snapshot["players/anne.json"]["name"] == "Anne"
     assert renamed_snapshot["players/an.json"]["name"] == "Anne"
+    assert renamed_snapshot["player-routes.json"]["an"] == "plr_abcde"
+    assert renamed_snapshot["player-routes.json"]["anne"] == "plr_abcde"
+    assert renamed_snapshot["players/plr_abcde.json"]["name"] == "Anne"
     assert json.loads(subprocess_result.stdout.strip().splitlines()[-1])[0] == "Anne"
 
 

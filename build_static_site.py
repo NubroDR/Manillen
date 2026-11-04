@@ -40,7 +40,13 @@ def _valid_snapshot_path(relative):
         path.as_posix() == relative
         and path.suffix == ".json"
         and (
-            relative in {"manifest.json", "players.json", "pairings.json", "hall-of-fame.json"}
+            relative in {
+                "manifest.json",
+                "players.json",
+                "player-routes.json",
+                "pairings.json",
+                "hall-of-fame.json",
+            }
             or (
                 len(path.parts) == 2
                 and path.parts[0] == "seasons"
