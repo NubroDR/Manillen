@@ -10,6 +10,8 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
 
 from data_paths import DATA_DIR
+from manillen_core.reference_adapter import ReferenceAdapter
+from manillen_core.reference_helpers import is_reserve_reference
 from manillen_core.season_helpers import DEFAULT_SEASON, migrate_pairing_history
 
 RESERVE_FILL = PatternFill(fill_type='solid', fgColor='FFF0CF')
@@ -21,6 +23,10 @@ def load_all_players(csv_filename=str(DATA_DIR / 'AllPlayers.csv')):
     Load all players from a CSV file with one column (no header).
     Returns a list of player names.
     """
+    path = Path(csv_filename)
+    if path.name == "players.csv":
+        return ReferenceAdapter.for_data_file(path).player_pool()
+
     players = []
     try:
         with open(csv_filename, 'r', encoding='utf-8') as f:
@@ -58,13 +64,17 @@ def create_player_pool(active_players):
 def load_pair_counts(csv_filename=str(DATA_DIR / 'pairings.csv')):
     """Load existing pair counts from CSV."""
     pair_counts = defaultdict(int)
+    adapter = ReferenceAdapter.for_data_file(csv_filename)
     try:
         with open(csv_filename, 'r', encoding='utf-8') as f:
             reader = csv.reader(f)
             next(reader, None)  # Skip header
             for row in reader:
                 if row:
-                    pair = tuple(sorted([row[0], row[1]]))
+                    pair = tuple(sorted([
+                        adapter.player_name(row[0]),
+                        adapter.player_name(row[1]),
+                    ]))
                     pair_counts[pair] = int(row[2])
     except FileNotFoundError:
         pass
@@ -77,6 +87,7 @@ def save_pairings_history(
     history_filename=str(DATA_DIR / 'pairings_history.csv'),
     season=DEFAULT_SEASON,
     location="",
+    reference_adapter=None,
 ):
     """Save a table pairing configuration to a history CSV file."""
     if play_date is None:
@@ -85,7 +96,8 @@ def save_pairings_history(
         play_date = play_date.isoformat()
 
     history_path = Path(history_filename)
-    if history_path.exists():
+    adapter = reference_adapter or ReferenceAdapter.for_data_file(history_path)
+    if history_path.exists() and not adapter.is_versioned:
         migrate_pairing_history(history_path)
     file_exists = history_path.exists()
 
@@ -101,9 +113,9 @@ def save_pairings_history(
             values = {
                 'Date': play_date,
                 'Table': table_number,
-                'Players': ' | '.join(group),
+                'Players': ' | '.join(adapter.player_id(player) for player in group),
                 'Season': season,
-                'Location': str(location or '').strip(),
+                'Location': adapter.location_id(location),
             }
             writer.writerow([values.get(field, '') for field in fieldnames])
 
@@ -149,6 +161,7 @@ def _clear_scoreblad_sheet(ws):
 def _load_pairings_history(play_date=None, history_filename=str(DATA_DIR / 'pairings_history.csv')):
     """Load pairings for a given date from pairings_history.csv."""
     play_date = _normalize_play_date(play_date).isoformat()
+    adapter = ReferenceAdapter.for_data_file(history_filename)
     pairings_by_table = {}
 
     try:
@@ -169,7 +182,11 @@ def _load_pairings_history(play_date=None, history_filename=str(DATA_DIR / 'pair
                     raise ValueError(f'Invalid table number {table_number} in history')
                 if table_number in pairings_by_table:
                     raise ValueError(f'Duplicate table entry for table {table_number} on {play_date}')
-                players = [p.strip() for p in row[2].split('|') if p.strip()]
+                players = [
+                    adapter.player_name(p)
+                    for p in row[2].split('|')
+                    if p.strip()
+                ]
                 if len(players) != 4:
                     raise ValueError(
                         f'Expected 4 players for table {table_number} on {play_date}, got {len(players)}'
@@ -502,16 +519,19 @@ def update_pairs_in_csv(
     """
     # Load existing counts
     pair_counts = load_pair_counts(csv_filename)
+    adapter = ReferenceAdapter.for_data_file(
+        history_filename or csv_filename
+    )
     
     # Add pairs from chosen configuration (excluding Reserve players)
     pairs_added = 0
     for group in config:
         for pair in it.combinations(sorted(group), 2):
             # Skip pairs with Reserve players
-            if any("Reserve" in player for player in pair):
+            if any(is_reserve_reference(player) for player in pair):
                 continue
-            
-            pair_key = tuple(sorted(pair))
+
+            pair_key = tuple(sorted(adapter.player_id(player) for player in pair))
             pair_counts[pair_key] += 1
             pairs_added += 1
     
@@ -529,6 +549,7 @@ def update_pairs_in_csv(
             history_filename=history_filename,
             season=season,
             location=location,
+            reference_adapter=adapter,
         )
 
     print(f"Updated {csv_filename} with {pairs_added} pairs (Reserve pairs excluded)")
@@ -568,7 +589,7 @@ def delete_pairings_by_date(play_date, csv_filename=str(DATA_DIR / 'pairings.csv
         participants = [p.strip() for p in players.split('|') if p.strip()]
         for pair in it.combinations(participants, 2):
             # Skip pairs with Reserve players, same as when adding pairs
-            if any('Reserve' in player for player in pair):
+            if any(is_reserve_reference(player) for player in pair):
                 continue
             pair_key = tuple(sorted(pair))
             current_count = pair_counts.get(pair_key, 0)

@@ -4,6 +4,14 @@
 
 **Basisregel voor alle tests:** gebruik uitsluitend tijdelijke testdata (`MANILLEN_DATA_DIR`); de echte `data/` blijft ongewijzigd.
 
+### Voortgang Fase 4 adaptergrondwerk (2026-11-04)
+
+- `manillen_core/reference_adapter.py` kan op tijdelijke fixtures namen en aliassen naar PlayerID/LocationID vertalen, IDs terug naar zichtbare namen omzetten, de actieve pool scheiden van niet-poolspelers en reserve-labels naar `RESERVE:n` converteren. Zonder ID-versie blijft de naamgebaseerde legacyweergave behouden.
+- Pool/pairings, score- en reservehelpers zijn deels aangesloten op ID-opslag. Pair-counts worden bij indeling naar namen vertaald; scorelezing en standen tonen namen en gekoppelde reservepersonen. Dit is nog geen volledige integratie van de hoofdapp, Exceluitvoer of publicatiegenerator.
+- **Validatie:** `.venv\Scripts\python.exe -m pytest -q tests\test_reference_adapter.py tests\test_reserve_assignments.py tests\test_score_functions.py` — `18 passed`; volledige `.venv\Scripts\python.exe -m pytest -q` — `94 passed`. `compileall` voor gewijzigde Pythonmodules en `git diff --check` slaagden.
+- Geen F4-acceptatietest wordt hiermee als volledig geslaagd beschouwd. `assert_legacy_data_compatible` blijft actief; er is geen echte datastore gebruikt en geen migratie of publicatie uitgevoerd.
+- **Volgende stap:** integreer en test de resterende `app.py`-lees-/schrijfstromen en gedeelde historiehelpers met `data_path`, inclusief UI-/historie-/locatie-/Excelnaamweergave; sluit daarna de snapshotgenerator aan op tijdelijke ID-datasets. Pas de fail-closed controle pas aan nadat alle relevante routes end-to-end zijn getest.
+
 ### Uitvoeringsstatus Fase 0 (2026-10-25)
 
 - **Geslaagd:** F0-01 t/m F0-06, F0-09 en F0-10. F0-03/F0-04 zijn als handberekende golden fixture vastgelegd in `tests/expected/phase0_baseline.json`; F0-05 bevestigt dat een gescoorde speler buiten de huidige pool in de tussenstand blijft staan (de huidige bron heeft nog geen `PoolMember`-kolom).
@@ -403,12 +411,14 @@ De handberekende verwachte uitkomsten staan naast de fixtures (`tests/expected/`
 | F5-23 | Aantal 3-0-tafels | Gelijk aan handberekende fixture; geen winstreeks-statistiek op het profiel (buiten scope) | U | S |
 | F5-24 | Partneroverzicht | Meest gespeeld en winstpercentage per partner gelijk aan handberekening | U | S |
 | F5-25 | Toon | Pagina bevat geen "nemesis" of "slechtste partner"; positieve formulering | S | M |
+| F5-26 | Profielpresentatie | Samenvatting staat in compacte label/waarde-kaarten; numerieke seizoenskolomkoppen en waarden zijn beide rechts uitgelijnd | E | S |
+| F5-27 | Aanwezigheid per seizoen | Telling en uitklapbare datums/locaties komen overeen met individuele deelnemersregistratie; legacybronnen met alleen aantallen tellen geen personen toe | U/E | M |
 
 ### 8.4 Scope en privacy
 
 | ID | Test | Verwacht | Type | Prio |
 |---|---|---|---|---|
-| F5-30 | Could-onderdelen (head-to-head, aanwezigheid, beste/slechtste speeldag, fun facts, reserve-optredens) | Niet aanwezig in de eerste release, tenzij apart goedgekeurd | S | M |
+| F5-30 | Niet-goedgekeurde Could-onderdelen (head-to-head, beste/slechtste speeldag, fun facts, reserve-optredens) | Niet aanwezig in de eerste release, tenzij apart goedgekeurd | S | M |
 | F5-31 | Aanwezigheidspercentage bij bron met enkel aantallen | Niet getoond | U | M |
 | F5-32 | Profiel-JSON | Bevat enkel publieke velden | S | M |
 

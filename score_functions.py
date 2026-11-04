@@ -3,6 +3,7 @@ from datetime import date
 from pathlib import Path
 
 from data_paths import DATA_DIR
+from manillen_core.reference_adapter import ReferenceAdapter
 from manillen_core.score_helpers import (
     compute_standings as _compute_standings,
     is_valid_game_score,
@@ -74,6 +75,13 @@ def _team_value(team):
     return " | ".join(str(player) for player in team)
 
 
+def _stored_team_value(team, adapter):
+    return " | ".join(
+        adapter.player_id(player)
+        for player in _team_value(team).split("|")
+    )
+
+
 def _score_value(value):
     if isinstance(value, bool) or value is None:
         raise ValueError("scores must be non-negative integers")
@@ -98,6 +106,7 @@ def save_scores(play_date, table, game_scores, scores_filename=str(DATA_DIR / "s
     if not isinstance(game_scores, (list, tuple)) or len(game_scores) != 3:
         raise ValueError("game_scores must contain exactly 3 games")
 
+    adapter = ReferenceAdapter.for_data_file(scores_filename)
     new_rows = []
     for game, score in enumerate(game_scores, start=1):
         if not isinstance(score, dict):
@@ -112,8 +121,8 @@ def save_scores(play_date, table, game_scores, scores_filename=str(DATA_DIR / "s
             "Date": play_date,
             "Table": str(table),
             "Game": str(game),
-            "Team1Players": _team_value(score["team1"]),
-            "Team2Players": _team_value(score["team2"]),
+            "Team1Players": _stored_team_value(score["team1"], adapter),
+            "Team2Players": _stored_team_value(score["team2"], adapter),
             "Team1Score": str(team1_score),
             "Team2Score": str(team2_score),
         })
@@ -147,6 +156,7 @@ def save_game_scores(
     if not isinstance(game_scores, (list, tuple)) or not game_scores:
         raise ValueError("game_scores must contain at least one game")
 
+    adapter = ReferenceAdapter.for_data_file(scores_filename)
     new_rows = []
     replaced_games = set()
     for score in game_scores:
@@ -179,8 +189,8 @@ def save_game_scores(
             "Date": play_date,
             "Table": str(table_number),
             "Game": str(game_number),
-            "Team1Players": _team_value(score["team1"]),
-            "Team2Players": _team_value(score["team2"]),
+            "Team1Players": _stored_team_value(score["team1"], adapter),
+            "Team2Players": _stored_team_value(score["team2"], adapter),
             "Team1Score": str(team1_score),
             "Team2Score": str(team2_score),
         })

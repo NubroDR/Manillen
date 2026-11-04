@@ -7,6 +7,10 @@ import secrets
 ID_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"
 ID_SUFFIX_LENGTH = 5
 ID_PREFIXES = {"player": "plr_", "location": "loc_"}
+_RESERVE_REFERENCE = re.compile(
+    r"^(?:RESERVE:([1-9]\d*)|Reserve\s+([1-9]\d*))$",
+    re.IGNORECASE,
+)
 
 
 def normalize_reference_name(value):
@@ -16,11 +20,15 @@ def normalize_reference_name(value):
 
 def is_reserve_reference(value):
     """Return whether a value is a reserve placeholder rather than a person."""
-    return bool(re.fullmatch(
-        r"reserve(?:\s+[1-9]\d*|:[1-9]\d*)",
-        str(value or "").strip(),
-        flags=re.IGNORECASE,
-    ))
+    return reserve_reference_token(value) is not None
+
+
+def reserve_reference_token(value):
+    """Return a reserve placeholder in canonical ``RESERVE:n`` form."""
+    match = _RESERVE_REFERENCE.fullmatch(str(value or "").strip())
+    if not match:
+        return None
+    return f"RESERVE:{int(match.group(1) or match.group(2))}"
 
 
 def generate_reference_id(kind, used_ids):
