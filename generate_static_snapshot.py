@@ -3,6 +3,8 @@
 import argparse
 import hashlib
 import json
+import re
+import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
@@ -31,6 +33,103 @@ from manillen_core.season_helpers import (
 
 def _season_key(season):
     return quote(str(season), safe="-_.~")
+
+
+def _player_slug(name):
+    candidate = unicodedata.normalize("NFKD", str(name).strip())
+    candidate = "".join(ch for ch in candidate if not unicodedata.combining(ch))
+    candidate = candidate.casefold().replace("&", " and ")
+    candidate = re.sub(r"[^a-z0-9]+", "-", candidate)
+    candidate = candidate.strip("-")
+    return candidate or "speler"
+
+
+def _team_players(value):
+    return [token.strip() for token in str(value).split("|") if token.strip()]
+
+
+def _player_profile(name, season_by_date, hall_of_fame, scores):
+    seasons = {}
+    total = {
+        "wins": 0,
+        "losses": 0,
+        "gamesPlayed": 0,
+        "pointsFor": 0,
+        "pointsAgainst": 0,
+    }
+    awards = []
+    for row in hall_of_fame:
+        if row.get("Player") == name:
+            for award in ("Gold", "Silver", "Bronze", "RedLantern"):
+                count = row.get(award, 0)
+                if count:
+                    awards.append({"award": award, "count": count})
+    for row in scores:
+        if not is_valid_game_score(row["Team1Score"], row["Team2Score"]):
+            continue
+        team1_players = _team_players(row["Team1Players"])
+        team2_players = _team_players(row["Team2Players"])
+        if name not in team1_players and name not in team2_players:
+            continue
+        season = season_by_date.get(row["Date"], "onbekend")
+        entry = seasons.setdefault(season, {
+            "season": season,
+            "gamesPlayed": 0,
+            "wins": 0,
+            "losses": 0,
+            "pointsFor": 0,
+            "pointsAgainst": 0,
+        })
+        team1_score = int(row["Team1Score"])
+        team2_score = int(row["Team2Score"])
+        if name in team1_players:
+            entry["pointsFor"] += team1_score
+            entry["pointsAgainst"] += team2_score
+            if team1_score > team2_score:
+                entry["wins"] += 1
+            else:
+                entry["losses"] += 1
+        else:
+            entry["pointsFor"] += team2_score
+            entry["pointsAgainst"] += team1_score
+            if team2_score > team1_score:
+                entry["wins"] += 1
+            else:
+                entry["losses"] += 1
+        entry["gamesPlayed"] += 1
+        total["gamesPlayed"] += 1
+        total["pointsFor"] += team1_score if name in team1_players else team2_score
+        total["pointsAgainst"] += team2_score if name in team1_players else team1_score
+        if (name in team1_players and team1_score > team2_score) or (name in team2_players and team2_score > team1_score):
+            total["wins"] += 1
+        else:
+            total["losses"] += 1
+    season_rows = []
+    for season, values in sorted(seasons.items(), key=lambda item: item[0]):
+        games_played = values["gamesPlayed"]
+        season_rows.append({
+            "season": season,
+            "gamesPlayed": games_played,
+            "wins": values["wins"],
+            "losses": values["losses"],
+            "pointsFor": values["pointsFor"],
+            "pointsAgainst": values["pointsAgainst"],
+            "pointDiff": values["pointsFor"] - values["pointsAgainst"],
+            "winRate": round(values["wins"] / games_played, 3) if games_played else 0.0,
+        })
+    return {
+        "name": name,
+        "slug": _player_slug(name),
+        "gamesPlayed": total["gamesPlayed"],
+        "wins": total["wins"],
+        "losses": total["losses"],
+        "pointsFor": total["pointsFor"],
+        "pointsAgainst": total["pointsAgainst"],
+        "pointDiff": total["pointsFor"] - total["pointsAgainst"],
+        "winRate": round(total["wins"] / total["gamesPlayed"], 3) if total["gamesPlayed"] else 0.0,
+        "awards": awards,
+        "seasons": season_rows,
+    }
 
 
 def _standings_rows(rows):
@@ -235,6 +334,7 @@ def build_snapshot(data_dir):
     all_labels = set(current_seasons) | set(legacy_by_label)
     all_history = load_pairing_records(history_path)
     all_scores = load_scores(scores_path)
+    season_by_date = {row["Date"]: row["Season"] for row in all_history}
     assignments = {}
     for row in all_history:
         assignments.setdefault(row["Date"], {})
@@ -337,6 +437,13 @@ def build_snapshot(data_dir):
         "pairings.json": partner_rows,
         "hall-of-fame.json": hall_of_fame,
     }
+    for player in players:
+        files[f"players/{_player_slug(player)}.json"] = _player_profile(
+            player,
+            season_by_date,
+            hall_of_fame,
+            all_scores,
+        )
     for label, payload in season_payloads.items():
         files[f"seasons/{_season_key(label)}.json"] = payload
     files["seasons/all.json"] = all_season_payload

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="robots" content="noindex">
+    <meta name="theme-color" content="#f4f2ed">
+    <meta name="description" content="Alleen-lezen overzicht van Manillen-speeldagen, tussenstand en parenhistoriek.">
+    <title>Manillen | Speeldagen</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="./styles.css?v=15cb5e826b7b2a29-7d9829be86dc">
+    <script type="module" src="./service-worker-cleanup.js?v=15cb5e826b7b2a29-7d9829be86dc"></script>
+    <script type="module" src="./app.js?v=15cb5e826b7b2a29-7d9829be86dc"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="site-header">
+        <a class="brand" href="#/tussenstand" aria-label="Manillen, startpagina">
+          <span class="brand-mark" aria-hidden="true">M</span>
+          <span>MANILLEN <span class="brand-slash">/</span> OVERZICHT</span>
+        </a>
+        <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false">
+          <span id="theme-icon" aria-hidden="true">🌙</span>
+          <span id="theme-label">Donkere modus</span>
+        </button>
+        <button
+          id="navigation-toggle"
+          class="menu-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="primary-navigation"
+          aria-label="Open navigatie"
+        >
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+        </button>
+        <nav id="primary-navigation" class="primary-navigation" aria-label="Hoofdnavigatie">
+          <a href="#/seizoenen" data-route="seizoenen">Seizoenen</a>
+          <a href="#/hall-of-fame" data-route="hall-of-fame">Hall of Fame</a>
+          <a href="#/tussenstand" data-route="tussenstand">Tussenstand</a>
+          <a href="#/speeldagen" data-route="speeldagen">Speeldagen</a>
+          <a href="#/scores" data-route="scores">Scores</a>
+          <a href="#/parenhistoriek" data-route="parenhistoriek">Parenhistoriek</a>
+        </nav>
+      </header>
+      <p id="legacy-worker-status" class="error-state" role="alert" hidden></p>
+      <main id="main-content" tabindex="-1">
+        <section class="intro" aria-labelledby="page-heading">
+          <p class="eyebrow">FAMILIE · SPEELDAGEN</p>
+          <h1 id="page-heading">Speeldagen, tussenstand en parenhistoriek.</h1>
+          <p class="intro-copy">Een actueel, alleen-lezen overzicht.</p>
+        </section>
+        <section class="panel" aria-labelledby="view-heading">
+          <div class="view-heading">
+            <div>
+              <p id="view-kicker" class="eyebrow">OVERZICHT</p>
+              <h2 id="view-heading">Tussenstand</h2>
+            </div>
+            <p id="build-label" class="build-label"></p>
+          </div>
+          <div id="view-controls" class="view-controls" aria-label="Filters"></div>
+          <div id="view-content" aria-live="polite" aria-busy="true">
+            <div class="loading-state">
+              <span class="loading-indicator" aria-hidden="true"></span>
+              <p>Gegevens laden…</p>
+            </div>
+          </div>
+        </section>
+      </main>
+      <footer class="site-footer">Manillen <span aria-hidden="true">·</span> Alleen-lezen overzicht</footer>
+    </div>
+  </body>
+</html>

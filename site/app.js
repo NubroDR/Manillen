@@ -5,6 +5,7 @@ const routeLabels = {
   speeldagen: "Speeldagen",
   scores: "Scores",
   parenhistoriek: "Parenhistoriek",
+  speler: "Speler",
 };
 
 const elements = {
@@ -45,6 +46,27 @@ function cell(label, value, className = "", icon = "") {
   }
   node.append(document.createTextNode(String(value)));
   node.dataset.label = label;
+  return node;
+}
+
+function playerSlug(name) {
+  return String(name || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("nl")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "speler";
+}
+
+function playerLink(name, className = "player-name-link") {
+  const link = element("a", String(name), className);
+  link.href = `#/speler/${playerSlug(name)}`;
+  return link;
+}
+
+function playerCell(label, value, className = "", icon = "") {
+  const node = cell(label, "", className, icon);
+  node.replaceChildren(playerLink(value));
   return node;
 }
 
@@ -196,9 +218,12 @@ async function loadSeason(season) {
 function routeFromHash() {
   const hash = window.location.hash.slice(1);
   const [path, query = ""] = hash.split("?", 2);
-  const route = path.replace(/^\/+/, "");
+  const parts = path.replace(/^\/+/, "").split("/").filter(Boolean);
+  const route = parts[0] && routeLabels[parts[0]] ? parts[0] : "tussenstand";
+  const player = route === "speler" && parts[1] ? decodeURIComponent(parts[1]) : "";
   return {
-    route: routeLabels[route] ? route : "tussenstand",
+    route,
+    player,
     params: new URLSearchParams(query),
   };
 }
@@ -354,7 +379,7 @@ function standingsView(data, route, params) {
   const lastActiveIndex = activeIndices.length ? activeIndices[activeIndices.length - 1] : -1;
   const bodyRows = rows.map((row, index) => [
     cell("#", index + 1, "numeric"),
-    cell("Speler", row.player, "", medalEmojis[index] || (index === lastActiveIndex ? "🏮" : "")),
+    playerCell("Speler", row.player, "", medalEmojis[index] || (index === lastActiveIndex ? "🏮" : "")),
     cell("Gewonnen", row.wins, "numeric"),
     cell("Gespeeld", row.gamesPlayed, "numeric"),
     cell("Voor", row.pointsFor, "numeric"),
@@ -403,7 +428,7 @@ function playdaysView(data, route, params) {
         names.setAttribute("aria-label", "Spelers aan tafel");
         for (const player of tableData.players) {
           const row = element("li", undefined, "player-result-row");
-          row.append(element("span", player, "player-result-name"));
+          row.append(playerLink(player, "player-result-name"));
           names.append(row);
         }
         tableCard.append(names);
@@ -421,7 +446,7 @@ function playdaysView(data, route, params) {
       for (const standing of tableData.standings) {
         const { player, wins, losses } = standing;
         const row = element("li", undefined, "player-result-row");
-        row.append(element("span", player, "player-result-name"));
+        row.append(playerLink(player, "player-result-name"));
         const result = element("strong", `${wins}-${losses}`, "player-result-record");
         result.setAttribute("aria-label", `${wins} gewonnen, ${losses} verloren`);
         row.append(result);
@@ -576,7 +601,7 @@ function hallOfFameView() {
   return table(
     ["Speler", "🥇 Goud", "🥈 Zilver", "🥉 Brons", "🏮 Rode lantaarn"],
     hallOfFame.map((row) => [
-      cell("Speler", row.Player),
+      playerCell("Speler", row.Player),
       cell("🥇 Goud", row.Gold, "numeric rank-gold"),
       cell("🥈 Zilver", row.Silver, "numeric rank-silver"),
       cell("🥉 Brons", row.Bronze, "numeric rank-bronze"),
@@ -588,18 +613,70 @@ function hallOfFameView() {
   );
 }
 
+async function loadPlayerProfile(slug) {
+  const safeSlug = String(slug || "").trim();
+  if (!safeSlug) return null;
+  try {
+    return await fetchJson(`players/${safeSlug}.json`);
+  } catch (error) {
+    console.warn("Spelersprofiel niet beschikbaar", error);
+    return null;
+  }
+}
+
+function playerProfileView(profile) {
+  if (!profile) {
+    return emptyState("Speler niet gevonden.");
+  }
+  const overview = table(
+    ["Veld", "Waarde"],
+    [
+      [cell("Veld", "Speler"), cell("Waarde", profile.name)],
+      [cell("Veld", "Gespeeld"), cell("Waarde", profile.gamesPlayed, "numeric")],
+      [cell("Veld", "Gewonnen"), cell("Waarde", profile.wins, "numeric")],
+      [cell("Veld", "Verloren"), cell("Waarde", profile.losses, "numeric")],
+      [cell("Veld", "Winstpercentage"), cell("Waarde", profile.winRate == null ? "n.v.t." : `${(profile.winRate * 100).toFixed(1)}%`)],
+      [cell("Veld", "Saldo"), cell("Waarde", profile.pointDiff, "numeric")],
+    ],
+  );
+  const wrapper = element("div", undefined, "player-profile");
+  const header = element("h3", profile.name, "player-profile-name");
+  wrapper.append(header, overview);
+  if (Array.isArray(profile.seasons) && profile.seasons.length) {
+    wrapper.append(table(
+      ["Seizoen", "Gespeeld", "Gewonnen", "Verloren", "Saldo"],
+      profile.seasons.map((season) => [
+        cell("Seizoen", season.season),
+        cell("Gespeeld", season.gamesPlayed, "numeric"),
+        cell("Gewonnen", season.wins, "numeric"),
+        cell("Verloren", season.losses, "numeric"),
+        cell("Saldo", season.pointDiff, "numeric"),
+      ]),
+      "data-table",
+    ));
+  }
+  return wrapper;
+}
+
 async function renderRoute() {
   const renderId = ++activeRender;
-  const { route, params } = routeFromHash();
+  const { route, player, params } = routeFromHash();
   const routeKey = route;
   updateNavigation(routeKey);
-  elements.heading.textContent = routeLabels[routeKey];
-  elements.kicker.textContent = "OVERZICHT";
+  elements.heading.textContent = routeLabels[routeKey] || "Tussenstand";
+  elements.kicker.textContent = routeKey === "speler" ? "SPELERS" : "OVERZICHT";
   closeNavigation();
   setLoading();
   try {
     if (!manifest) {
       throw new Error("Het snapshotmanifest is nog niet geladen.");
+    }
+    if (route === "speler") {
+      const slug = player || params.get("speler") || "";
+      const profile = await loadPlayerProfile(slug);
+      if (renderId !== activeRender) return;
+      setContent(playerProfileView(profile) || emptyState("Speler niet gevonden."));
+      return;
     }
     if (route === "seizoenen") {
       const seasonData = await Promise.all(

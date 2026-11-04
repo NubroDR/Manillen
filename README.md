@@ -39,6 +39,7 @@ Kortom: als een wijziging "groot" is, dan is een README-update verplicht. Als ee
 - Alle ingevulde scores voor een speeldag met één knop opslaan; onvolledige spellen worden overgeslagen met een melding.
 - Een tussenstand en speeldaggeschiedenis bekijken met een seizoensfilter.
 - Historische seizoenen en de Hall of Fame bekijken.
+- Doorklikbare spelersnavigatie in de statische mirror met compacte profielpagina's en seizoenssamenvattingen.
 - Een alleen-lezen mirror publiceren naar GitHub Pages (de productie gebruikt nog Shinylive; de statische versie staat op de aparte preview).
 
 ## Projectstructuur

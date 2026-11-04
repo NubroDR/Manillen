@@ -46,6 +46,11 @@ def _valid_snapshot_path(relative):
                 and path.parts[0] == "seasons"
                 and ":" not in path.parts[1]
             )
+            or (
+                len(path.parts) == 2
+                and path.parts[0] == "players"
+                and ":" not in path.parts[1]
+            )
         )
     )
 

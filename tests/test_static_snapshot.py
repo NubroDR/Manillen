@@ -550,6 +550,25 @@ def test_static_site_build_contains_only_derived_json_and_site_assets(tmp_path):
     assert tree_hash(data_dir) == before
 
 
+def test_snapshot_generates_player_profile_files_and_allows_them_in_site_output(tmp_path):
+    data_dir = tmp_path / "data"
+    make_snapshot_fixture(data_dir)
+
+    snapshot = generate_snapshot(data_dir, tmp_path / "snapshot")
+    files = read_json_tree(tmp_path / "snapshot")
+    profile = files["players/an.json"]
+
+    assert profile["name"] == "An"
+    assert profile["slug"] == "an"
+    assert profile["gamesPlayed"] >= 1
+    assert profile["wins"] >= 1
+    assert "seasons" in profile
+
+    site_dir = tmp_path / "site-output"
+    build_site(data_dir, site_dir, generated_at=snapshot["generatedAt"])
+    assert (site_dir / "data" / "players" / "an.json").is_file()
+
+
 def test_static_site_refuses_nonempty_output_without_removing_files(tmp_path):
     data_dir = tmp_path / "data"
     make_snapshot_fixture(data_dir)
