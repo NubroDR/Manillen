@@ -15,4 +15,5 @@ applyTo:
 - Keep deployment configuration consistent with the README, including host data paths, ports, required environment variables, and workflow names.
 - Keep secrets in runtime environment or GitHub Actions secrets. Never add credentials to the image, repository, workflow output, or user-facing messages.
 - Preserve least-privilege workflow permissions and avoid changing workflow triggers or deployment targets without updating the README.
+- For completed, validated static-mirror features, the user has authorized automatic deployment to `NubroDR/manillen-preview`; verify its Pages run and URL. This standing approval is limited to the separate preview and does not authorize publishing to production or changing the main repository's `docs/`.
 - After changing deployment or publishing behavior, validate the relevant YAML/configuration and update `README.md` in the same change.
