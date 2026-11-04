@@ -67,7 +67,7 @@
 - `profile_data.py` meldt aliassen die na hoofdletter-/spatie-normalisatie naar meerdere ID's wijzen; de standaardrapportage geeft de aliassleutel en doel-ID's niet prijs.
 - Tests op tijdelijke fixtures bevestigen de ID-prefixen/alfabetten, collision retry, poolstatus, reserve-placeholders, handmatige statusreview voor niet-poolspelers en locaties, weigeren van output in de datastore en weigeren van overschrijven. De hashcontrole omvat ook bestaande scorebladbestanden en de geneste `Scorebladen/`-map.
 - `tests/test_migrate_ids.py` en `tests/test_profile_data.py`: `13 passed`. Geen echte of NAS-data gebruikt.
-- **Open bij voorstel:** F3-08 t/m F3-19 en F3-20 t/m F3-22, F3-25 t/m F3-39. De basisstaging en validatie zijn op tijdelijke fixtures gecontroleerd, maar backup, procesonderbreking, active-manifest, activatie, data-path-resolutie en rollback ontbreken. Het voorstel mag niet op actieve data worden toegepast.
+- **Open bij voorstel:** F3-08 t/m F3-22 en F3-25 t/m F3-27, F3-29 t/m F3-39. Staging en resolver zijn deels op tijdelijke fixtures gecontroleerd; backup, procesonderbreking, atomische activering, startupcontroles en rollback ontbreken. Het voorstel mag niet op actieve data worden toegepast.
 
 ### Voortgang Fase 3: inactieve staging (2026-11-04)
 
@@ -76,7 +76,14 @@
 - Validatie controleert schemas, ID-/aliasreferenties, reserve-slots, scores, rij-aantallen en partnercount-baseline. Er is geen backup-, apply-, manifestactivatie- of rollbackroute; geen echte datastore gebruikt.
 - `tests/test_stage_ids.py`, `tests/test_migrate_ids.py` en `tests/test_profile_data.py`: gericht geslaagd (`17 passed`).
 - **Validatie:** de gerichte tests slaagden (`17 passed`) en de volledige regressiesuite slaagde (`70 passed`).
-- **Nog open:** versioned active-manifest en `data_paths.py`, procesonderbreking, backup en atomische activatie uitsluitend op tijdelijke fixtures.
+- **Nog open:** procesonderbreking, backup, atomische activatie, startup-schema-/referentiecontrole en rollback uitsluitend op tijdelijke fixtures.
+
+### Voortgang Fase 3: active-version-resolutie (2026-11-04)
+
+- `data_paths.py` behoudt legacygedrag wanneer `active-version.json` ontbreekt. Met manifest resolveert het uitsluitend de negen versioned CSV-bestanden naar `versions/<active_version>/`; niet-versioned legacybronnen en scorebladen blijven in de datastore-root.
+- Ongeldig JSON/schema, ongeldige of ontbrekende versiemap, een versie buiten de datastore en ontbrekende versioned bestanden stoppen expliciet; versie-ID wordt niet als padfragment geaccepteerd.
+- Gerichte resolver- en stagingtests geslaagd; de volledige pytest-suite slaagde (`80 passed`). F3-28 is hiermee gedeeltelijk afgedekt. Dit is nog geen activatiecommando en de app/generator zijn nog niet omgezet naar ID-schema's.
+- **Nog open:** backup, atomische manifestwisseling, procesonderbreking, startup-schema-/referentiecontrole en rollback; uitsluitend tijdelijke fixtures.
 
 ### Mobiele UI-feedback (2026-11-04)
 

@@ -46,7 +46,7 @@ Kortom: als een wijziging "groot" is, dan is een README-update verplicht. Als ee
 ```text
 .
 ├── app.py                    # Volledige schrijfbare NAS-app.
-├── data_paths.py             # Data-directory, configureerbaar via MANILLEN_DATA_DIR.
+├── data_paths.py             # Datastore-root en fail-closed resolutie via active-version.json.
 ├── manillen_core/            # Gedeelde CSV-, seizoen-, score- en referentiehelpers.
 ├── manillen_functions.py     # Indeling, paringen en scorebladlogica.
 ├── score_functions.py        # Schrijfbare scoreworkflow met gedeelde scoreberekening.
@@ -156,6 +156,8 @@ python stage_ids.py --data-dir "<tijdelijke datastore>" `
 ```
 
 Dit is alleen een stagingtransformatie; er is nog geen backup-, apply-, activatie- of rollbackcommando. Gebruik geen repository- of NAS-data voor deze testfase.
+
+`data_paths.py` ondersteunt nu de toekomstige `active-version.json`: zonder manifest blijft de huidige datastore-root actief; met manifest worden uitsluitend de negen versioned CSV-paden uit `versions/<active_version>/` gelezen. Een ontbrekende/ongeldige versie of ontbrekend bestand geeft een expliciete fout; legacybestanden en scorebladen blijven in de root. Er is nog geen commando dat een versie activeert en de bestaande app is nog niet op ID-bestanden overgezet.
 
 ## Statische mirror-preview (preview live; productiecutover open)
 
