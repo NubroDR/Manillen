@@ -15,3 +15,6 @@ shinylive-cache/
 # Local OS files.
 .DS_Store
 Thumbs.db
+
+# The preview is maintained as a separate clone, not a submodule.
+/manillen-preview/
