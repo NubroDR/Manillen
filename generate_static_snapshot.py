@@ -48,7 +48,7 @@ def _team_players(value):
     return [token.strip() for token in str(value).split("|") if token.strip()]
 
 
-def _player_profile(name, season_by_date, hall_of_fame, scores):
+def _player_profile(name, season_by_date, hall_of_fame, scores, all_history, assignments):
     seasons = {}
     total = {
         "wins": 0,
@@ -64,6 +64,32 @@ def _player_profile(name, season_by_date, hall_of_fame, scores):
                 count = row.get(award, 0)
                 if count:
                     awards.append({"award": award, "count": count})
+
+    def season_entry(season):
+        return seasons.setdefault(season, {
+            "season": season,
+            "gamesPlayed": 0,
+            "wins": 0,
+            "losses": 0,
+            "pointsFor": 0,
+            "pointsAgainst": 0,
+            "playdays": {},
+        })
+
+    for row in all_history:
+        play_date = row["Date"]
+        date_assignments = assignments.get(play_date, {})
+        players_present = {
+            date_assignments.get(player, player)
+            for player in row["Players"]
+        }
+        if name not in players_present:
+            continue
+        entry = season_entry(season_by_date.get(play_date, "onbekend"))
+        locations = entry["playdays"].setdefault(play_date, set())
+        if row.get("Location"):
+            locations.add(row["Location"])
+
     for row in scores:
         if not is_valid_game_score(row["Team1Score"], row["Team2Score"]):
             continue
@@ -72,14 +98,7 @@ def _player_profile(name, season_by_date, hall_of_fame, scores):
         if name not in team1_players and name not in team2_players:
             continue
         season = season_by_date.get(row["Date"], "onbekend")
-        entry = seasons.setdefault(season, {
-            "season": season,
-            "gamesPlayed": 0,
-            "wins": 0,
-            "losses": 0,
-            "pointsFor": 0,
-            "pointsAgainst": 0,
-        })
+        entry = season_entry(season)
         team1_score = int(row["Team1Score"])
         team2_score = int(row["Team2Score"])
         if name in team1_players:
@@ -107,6 +126,13 @@ def _player_profile(name, season_by_date, hall_of_fame, scores):
     season_rows = []
     for season, values in sorted(seasons.items(), key=lambda item: item[0]):
         games_played = values["gamesPlayed"]
+        playdays = [
+            {
+                "date": play_date,
+                "locations": sorted(locations, key=str.casefold),
+            }
+            for play_date, locations in sorted(values["playdays"].items())
+        ]
         season_rows.append({
             "season": season,
             "gamesPlayed": games_played,
@@ -116,6 +142,8 @@ def _player_profile(name, season_by_date, hall_of_fame, scores):
             "pointsAgainst": values["pointsAgainst"],
             "pointDiff": values["pointsFor"] - values["pointsAgainst"],
             "winRate": round(values["wins"] / games_played, 3) if games_played else 0.0,
+            "playdaysAttended": len(playdays),
+            "playdays": playdays,
         })
     return {
         "name": name,
@@ -443,6 +471,8 @@ def build_snapshot(data_dir):
             season_by_date,
             hall_of_fame,
             all_scores,
+            all_history,
+            assignments,
         )
     for label, payload in season_payloads.items():
         files[f"seasons/{_season_key(label)}.json"] = payload

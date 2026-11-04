@@ -58,16 +58,68 @@ function playerSlug(name) {
     .replace(/^-+|-+$/g, "") || "speler";
 }
 
-function playerLink(name, className = "player-name-link") {
-  const link = element("a", String(name), className);
-  link.href = `#/speler/${playerSlug(name)}`;
+function profileAction(name, className = "player-profile-action") {
+  const display = String(name || "").trim();
+  if (!display || /^Reserve\s+\d+$/i.test(display)) {
+    return element("span", "", className + " is-hidden");
+  }
+  const link = element("a", "👤", className);
+  link.href = `#/speler/${playerSlug(display)}`;
+  link.setAttribute("aria-label", `Open profiel van ${display}`);
+  link.title = `Open profiel van ${display}`;
   return link;
 }
 
+function playerLabel(name, className = "player-name-label") {
+  const display = String(name || "").trim();
+  if (!display) return element("span", "—", className + " is-placeholder");
+  const label = element("span", display, className);
+  if (/^Reserve\s+\d+$/i.test(display)) label.classList.add("is-placeholder");
+  return label;
+}
+
+function playerNameWithAction(name, className = "player-name-label") {
+  const display = String(name || "").trim();
+  if (!display) return element("span", "—", className + " is-placeholder");
+  const wrapper = element("span", undefined, "player-name-row");
+  wrapper.append(playerLabel(display, className));
+  const action = profileAction(display);
+  if (!action.classList.contains("is-hidden")) wrapper.append(action);
+  return wrapper;
+}
+
+function profileCell(name, className = "player-profile-cell") {
+  const cellNode = element("td", undefined, className);
+  cellNode.dataset.label = "Profiel";
+  const action = profileAction(name);
+  if (!action.classList.contains("is-hidden")) {
+    cellNode.append(action);
+  }
+  return cellNode;
+}
+
 function playerCell(label, value, className = "", icon = "") {
-  const node = cell(label, "", className, icon);
-  node.replaceChildren(playerLink(value));
+  const node = element("td", undefined, className);
+  node.dataset.label = label;
+  if (icon) {
+    const marker = element("span", icon, "rank-emoji");
+    marker.setAttribute("aria-hidden", "true");
+    node.append(marker);
+  }
+  node.append(playerLabel(value));
   return node;
+}
+
+function teamPlayersDisplay(value, className = "player-name-label") {
+  const names = String(value || "").split("|").map((part) => part.trim()).filter(Boolean);
+  if (!names.length) return element("span", "—", className + " is-placeholder");
+  const wrapper = document.createElement("span");
+  wrapper.className = "team-players";
+  for (const [index, name] of names.entries()) {
+    if (index > 0) wrapper.append(document.createTextNode(" + "));
+    wrapper.append(playerLabel(name, className));
+  }
+  return wrapper;
 }
 
 function table(headers, rows, className = "data-table", rowClasses = [], headerClasses = []) {
@@ -380,6 +432,7 @@ function standingsView(data, route, params) {
   const bodyRows = rows.map((row, index) => [
     cell("#", index + 1, "numeric"),
     playerCell("Speler", row.player, "", medalEmojis[index] || (index === lastActiveIndex ? "🏮" : "")),
+    profileCell(row.player),
     cell("Gewonnen", row.wins, "numeric"),
     cell("Gespeeld", row.gamesPlayed, "numeric"),
     cell("Voor", row.pointsFor, "numeric"),
@@ -391,7 +444,7 @@ function standingsView(data, route, params) {
   ));
   const root = element("div");
   root.append(table(
-    ["#", "Speler", "Gewonnen", "Gespeeld", "Voor", "Tegen", "Saldo"],
+    ["#", "Speler", "Profiel", "Gewonnen", "Gespeeld", "Voor", "Tegen", "Saldo"],
     bodyRows,
     "data-table",
     rowClasses,
@@ -428,7 +481,8 @@ function playdaysView(data, route, params) {
         names.setAttribute("aria-label", "Spelers aan tafel");
         for (const player of tableData.players) {
           const row = element("li", undefined, "player-result-row");
-          row.append(playerLink(player, "player-result-name"));
+          row.append(playerLabel(player, "player-result-name"));
+          row.append(profileAction(player));
           names.append(row);
         }
         tableCard.append(names);
@@ -446,10 +500,11 @@ function playdaysView(data, route, params) {
       for (const standing of tableData.standings) {
         const { player, wins, losses } = standing;
         const row = element("li", undefined, "player-result-row");
-        row.append(playerLink(player, "player-result-name"));
+        row.append(playerLabel(player, "player-result-name"));
         const result = element("strong", `${wins}-${losses}`, "player-result-record");
         result.setAttribute("aria-label", `${wins} gewonnen, ${losses} verloren`);
         row.append(result);
+        row.append(profileAction(player));
         names.append(row);
       }
       tableCard.append(names);
@@ -500,6 +555,10 @@ function scoresTable(data, selectedDate, playerQuery) {
     rows.map((row) => {
       const team1Won = row.validScore && row.team1Score > row.team2Score;
       const team2Won = row.validScore && row.team2Score > row.team1Score;
+      const team1Cell = cell("Team 1", "", !row.validScore ? "" : team1Won ? "score-winner" : "score-loser");
+      team1Cell.replaceChildren(teamPlayersDisplay(row.team1Players, "player-name-link"));
+      const team2Cell = cell("Team 2", "", !row.validScore ? "" : team2Won ? "score-winner" : "score-loser");
+      team2Cell.replaceChildren(teamPlayersDisplay(row.team2Players, "player-name-link"));
       return [
         cell("Datum", row.date),
         cell("Tafel", row.table, "numeric"),
@@ -508,17 +567,9 @@ function scoresTable(data, selectedDate, playerQuery) {
           row.validScore ? row.game : `${row.game} — ongeldig: gelijke score`,
           row.validScore ? "numeric" : "numeric score-invalid",
         ),
-        cell(
-          "Team 1",
-          row.team1Players.replaceAll("|", " + "),
-          !row.validScore ? "" : team1Won ? "score-winner" : "score-loser",
-        ),
+        team1Cell,
         cell("Score", row.team1Score, "numeric"),
-        cell(
-          "Team 2",
-          row.team2Players.replaceAll("|", " + "),
-          !row.validScore ? "" : team2Won ? "score-winner" : "score-loser",
-        ),
+        team2Cell,
         cell("Score", row.team2Score, "numeric"),
       ];
     }),
@@ -547,8 +598,8 @@ function pairingsTable(playerQuery) {
   return table(
     ["Speler 1", "Speler 2", "Samen gespeeld"],
     rows.map((row) => [
-      cell("Speler 1", row.player1),
-      cell("Speler 2", row.player2),
+      playerCell("Speler 1", row.player1),
+      playerCell("Speler 2", row.player2),
       cell("Samen gespeeld", row.count, "numeric"),
     ]),
   );
@@ -628,32 +679,71 @@ function playerProfileView(profile) {
   if (!profile) {
     return emptyState("Speler niet gevonden.");
   }
-  const overview = table(
-    ["Veld", "Waarde"],
-    [
-      [cell("Veld", "Speler"), cell("Waarde", profile.name)],
-      [cell("Veld", "Gespeeld"), cell("Waarde", profile.gamesPlayed, "numeric")],
-      [cell("Veld", "Gewonnen"), cell("Waarde", profile.wins, "numeric")],
-      [cell("Veld", "Verloren"), cell("Waarde", profile.losses, "numeric")],
-      [cell("Veld", "Winstpercentage"), cell("Waarde", profile.winRate == null ? "n.v.t." : `${(profile.winRate * 100).toFixed(1)}%`)],
-      [cell("Veld", "Saldo"), cell("Waarde", profile.pointDiff, "numeric")],
-    ],
-  );
   const wrapper = element("div", undefined, "player-profile");
   const header = element("h3", profile.name, "player-profile-name");
-  wrapper.append(header, overview);
+  const stats = element("dl", undefined, "profile-stats");
+  const values = [
+    ["Gespeeld", profile.gamesPlayed],
+    ["Gewonnen", profile.wins],
+    ["Verloren", profile.losses],
+    ["Winstpercentage", profile.winRate == null ? "n.v.t." : `${(profile.winRate * 100).toFixed(1)}%`],
+    ["Saldo", profile.pointDiff],
+  ];
+  for (const [label, value] of values) {
+    const item = element("div", undefined, "profile-stat");
+    item.append(element("dt", label), element("dd", value));
+    stats.append(item);
+  }
+  wrapper.append(header, stats);
   if (Array.isArray(profile.seasons) && profile.seasons.length) {
     wrapper.append(table(
-      ["Seizoen", "Gespeeld", "Gewonnen", "Verloren", "Saldo"],
+      ["Seizoen", "Gespeeld", "Gewonnen", "Verloren", "Saldo", "Aanwezig"],
       profile.seasons.map((season) => [
         cell("Seizoen", season.season),
         cell("Gespeeld", season.gamesPlayed, "numeric"),
         cell("Gewonnen", season.wins, "numeric"),
         cell("Verloren", season.losses, "numeric"),
         cell("Saldo", season.pointDiff, "numeric"),
+        cell("Aanwezig", season.playdaysAttended || 0, "numeric"),
       ]),
       "data-table",
+      [],
+      ["", "numeric", "numeric", "numeric", "numeric", "numeric"],
     ));
+
+    const attendedSeasons = profile.seasons.filter(
+      (season) => Array.isArray(season.playdays) && season.playdays.length,
+    );
+    if (attendedSeasons.length) {
+      const attendance = element("section", undefined, "profile-attendance");
+      attendance.append(element("h4", "Aanwezigheid per seizoen"));
+      for (const season of attendedSeasons) {
+        const details = element("details", undefined, "profile-attendance-season");
+        details.append(element(
+          "summary",
+          `${season.season} · ${season.playdays.length} ${season.playdays.length === 1 ? "speeldag" : "speeldagen"}`,
+        ));
+        const playdays = element("ul");
+        for (const playday of season.playdays) {
+          const item = element("li");
+          const date = element("time", playday.date);
+          date.dateTime = playday.date;
+          const locations = Array.isArray(playday.locations) && playday.locations.length
+            ? playday.locations.join(", ")
+            : "Locatie onbekend";
+          item.append(date, document.createTextNode(" · "), element("span", locations));
+          playdays.append(item);
+        }
+        details.append(playdays);
+        attendance.append(details);
+      }
+      attendance.append(element(
+        "p",
+        "Persoonlijke aanwezigheid is beschikbaar voor speeldagen met spelersregistratie.",
+        "subtle-note",
+      ));
+      wrapper.append(attendance);
+    }
   }
   return wrapper;
 }

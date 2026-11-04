@@ -563,6 +563,21 @@ def test_snapshot_generates_player_profile_files_and_allows_them_in_site_output(
     assert profile["gamesPlayed"] >= 1
     assert profile["wins"] >= 1
     assert "seasons" in profile
+    old_season = next(
+        season for season in profile["seasons"] if season["season"] == "2025-2026"
+    )
+    assert old_season["playdaysAttended"] == 1
+    assert old_season["playdays"] == [
+        {"date": "2025-10-04", "locations": ["Gent"]}
+    ]
+
+    reserve_profile = files["players/freddy.json"]
+    new_season = next(
+        season for season in reserve_profile["seasons"] if season["season"] == "2026-2027"
+    )
+    assert new_season["playdays"] == [
+        {"date": "2026-05-16", "locations": ["Brugge"]}
+    ]
 
     site_dir = tmp_path / "site-output"
     build_site(data_dir, site_dir, generated_at=snapshot["generatedAt"])

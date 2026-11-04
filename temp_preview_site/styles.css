@@ -376,6 +376,63 @@ select:focus-visible {
   margin-right: 6px;
 }
 
+.player-name-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.player-name-label {
+  color: inherit;
+  font-weight: 600;
+}
+
+.player-name-label.is-placeholder {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.player-profile-action,
+.player-profile-action:visited {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-muted);
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.player-profile-action:hover,
+.player-profile-action:focus-visible {
+  background: var(--surface);
+  text-decoration: none;
+}
+
+.player-profile-action.is-hidden {
+  display: none;
+}
+
+.player-profile-cell {
+  width: 3.5rem;
+  text-align: center;
+}
+
+.team-players {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.2em;
+  align-items: center;
+}
+
 .score-winner {
   color: var(--accent);
   font-weight: 750;
@@ -465,12 +522,12 @@ select:focus-visible {
 }
 
 .player-result-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   min-width: 0;
   min-height: 40px;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   padding: 6px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -479,7 +536,78 @@ select:focus-visible {
 }
 
 .player-result-name {
+  min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.player-profile {
+  display: grid;
+  gap: 18px;
+}
+
+.player-profile-name {
+  margin: 0;
+}
+
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.profile-stat {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-muted);
+}
+
+.profile-stat dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.profile-stat dd {
+  margin: 7px 0 0;
+  font-size: 1.15rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.profile-attendance h4 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.profile-attendance-season {
+  border-bottom: 1px solid var(--line);
+}
+
+.profile-attendance-season summary {
+  min-height: 44px;
+  padding: 11px 4px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.profile-attendance-season ul {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0 4px 12px 22px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.profile-attendance-season time {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 .player-result-record {
