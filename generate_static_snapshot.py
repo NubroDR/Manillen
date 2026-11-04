@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
-from data_paths import DATA_DIR
+from data_paths import DATA_DIR, assert_legacy_data_compatible
 from manillen_core.data_helpers import (
     load_all_players,
     load_pairing_counts,
@@ -205,6 +205,7 @@ def _season_snapshot(
 def build_snapshot(data_dir):
     """Build deterministic JSON-serializable derived data from a CSV directory."""
     data_dir = Path(data_dir).resolve()
+    assert_legacy_data_compatible(data_dir)
     players_path = data_dir / "AllPlayers.csv"
     pairings_path = data_dir / "pairings.csv"
     history_path = data_dir / "pairings_history.csv"

@@ -64,6 +64,8 @@ Kortom: als een wijziging "groot" is, dan is een README-update verplicht. Als ee
 ├── build_static_site.py      # Bouwt een statische preview in een lege outputmap.
 ├── migrate_ids.py            # Maakt een privé, alleen-lezen ID-migratievoorstel.
 ├── stage_ids.py              # Bouwt een gevalideerde, inactieve ID-stagingversie.
+├── versioned_data.py         # Schema- en referentievalidatie voor ID-datasets.
+├── data_versions.py          # Full backup, atomische activering en rollback.
 ├── site/                     # Bronbestanden van de nieuwe vanilla-JS preview.
 ├── static_snapshot.zip       # JSON-only invoerarchief voor de handmatige Pages-workflow.
 ├── data/
@@ -155,9 +157,19 @@ python stage_ids.py --data-dir "<tijdelijke datastore>" `
   --staging-output "<private stagingmap>"
 ```
 
-Dit is alleen een stagingtransformatie; er is nog geen backup-, apply-, activatie- of rollbackcommando. Gebruik geen repository- of NAS-data voor deze testfase.
+`data_paths.py` ondersteunt `active-version.json`: zonder manifest blijft de huidige datastore-root actief; met manifest worden de negen ID-CSV's uit `versions/<active_version>/` gecontroleerd op schema's en verwijzingen. Legacybronnen en scorebladen blijven in de root. `data_versions.py` biedt full-backup en manifest-activering/rollback:
 
-`data_paths.py` ondersteunt nu de toekomstige `active-version.json`: zonder manifest blijft de huidige datastore-root actief; met manifest worden uitsluitend de negen versioned CSV-paden uit `versions/<active_version>/` gelezen. Een ontbrekende/ongeldige versie of ontbrekend bestand geeft een expliciete fout; legacybestanden en scorebladen blijven in de root. Er is nog geen commando dat een versie activeert en de bestaande app is nog niet op ID-bestanden overgezet.
+```powershell
+python data_versions.py activate --data-dir "<testdatastore>" `
+  --staging "<private stagingmap>" `
+  --backup-output "<nieuwe externe backupmap>" --confirm
+python data_versions.py rollback --data-dir "<testdatastore>" `
+  --backup-output "<nieuwe externe rollback-backupmap>"
+```
+
+De backup is een unieke, geverifieerde kopie van de volledige datastore. Activering kopieert een gevalideerde stagingversie naar `versions/` en wijzigt daarna alleen `active-version.json` via een tijdelijke file en atomische replace; vóór die replace blijft de vorige versie actief. Rollback weigert standaard als bestanden sinds activering zijn veranderd en rapporteert de rij-aantallen; `--confirm-data-loss` is vereist om die wijzigingen bewust te laten vallen. Oude versies worden nooit verwijderd.
+
+**Niet op de echte NAS-datastore toepassen.** De huidige schrijfbare app en mirror gebruiken nog naamgebaseerde CSV's. Ze weigeren daarom expliciet te starten/publiceren wanneer een ID-versie actief is. Een activatie op productie zou de app buiten gebruik zetten totdat Fase 4 de ID-adapter heeft opgeleverd en uitgerold. Gebruik deze commando's nu alleen met tijdelijke testdata.
 
 ## Statische mirror-preview (preview live; productiecutover open)
 

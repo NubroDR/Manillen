@@ -67,23 +67,25 @@
 - `profile_data.py` meldt aliassen die na hoofdletter-/spatie-normalisatie naar meerdere ID's wijzen; de standaardrapportage geeft de aliassleutel en doel-ID's niet prijs.
 - Tests op tijdelijke fixtures bevestigen de ID-prefixen/alfabetten, collision retry, poolstatus, reserve-placeholders, handmatige statusreview voor niet-poolspelers en locaties, weigeren van output in de datastore en weigeren van overschrijven. De hashcontrole omvat ook bestaande scorebladbestanden en de geneste `Scorebladen/`-map.
 - `tests/test_migrate_ids.py` en `tests/test_profile_data.py`: `13 passed`. Geen echte of NAS-data gebruikt.
-- **Open bij voorstel:** F3-08 t/m F3-22 en F3-25 t/m F3-27, F3-29 t/m F3-39. Staging en resolver zijn deels op tijdelijke fixtures gecontroleerd; backup, procesonderbreking, atomische activering, startupcontroles en rollback ontbreken. Het voorstel mag niet op actieve data worden toegepast.
+- **Open bij voorstel:** F3-08 t/m F3-19, F3-22, F3-25, F3-29 t/m F3-39. Backup, activering/rollback, schema-/referentiechecks en manifestonderbreking zijn gedeeltelijk geautomatiseerd; de app-adapter en productie-/containeracceptatie ontbreken. Het voorstel mag niet op actieve data worden toegepast.
 
 ### Voortgang Fase 3: inactieve staging (2026-11-04)
 
 - `stage_ids.py` transformeert uitsluitend een voorstel waarvan de inhoudshash geldig is, de bronbestanden nog dezelfde hashes hebben en een aparte approval-JSON exact naar die voorstelhash verwijst. Handmatige `Active`-/`PoolMember`-statussen zijn verplicht.
 - Staging wordt naar een nieuwe directory buiten datastore en repository geschreven via een tijdelijke sibling-map en rename. De uitvoer bevat de negen geversioneerde CSV's plus een privé manifest; actieve bronbestanden, legacybronnen, `Scorebladen.xlsx` en `Scorebladen/` blijven onaangeroerd.
-- Validatie controleert schemas, ID-/aliasreferenties, reserve-slots, scores, rij-aantallen en partnercount-baseline. Er is geen backup-, apply-, manifestactivatie- of rollbackroute; geen echte datastore gebruikt.
+- Validatie controleert schemas, ID-/aliasreferenties, reserve-slots en scores. `data_versions.py` maakt een unieke, volledige geverifieerde backup, activeert via een atomische manifestwissel en ondersteunt rollback met controle op wijzigingen en expliciete bevestiging bij mogelijk dataverlies.
 - `tests/test_stage_ids.py`, `tests/test_migrate_ids.py` en `tests/test_profile_data.py`: gericht geslaagd (`17 passed`).
-- **Validatie:** de gerichte tests slaagden (`17 passed`) en de volledige regressiesuite slaagde (`70 passed`).
-- **Nog open:** procesonderbreking, backup, atomische activatie, startup-schema-/referentiecontrole en rollback uitsluitend op tijdelijke fixtures.
+- **Validatie:** de lifecycle-/resolver-/stagingtests slaagden (`23 passed`) en de volledige regressiesuite slaagde (`88 passed`). Tests gebruiken uitsluitend tijdelijke fixtures; backup-copy-fouten laten geen gedeeltelijke backup achter en een onderbreking vóór manifest-replace laat de vorige versie actief. CLI-help en `git diff --check` zijn gecontroleerd.
+- **Nog open:** foutinjectie tijdens het kopiëren van staging naar `versions/`, rollback naar een vorige ID-versie, Docker-startup, en integratie van de Fase 4-adapter. Alleen tijdelijke fixtures; productie blijft geblokkeerd.
 
 ### Voortgang Fase 3: active-version-resolutie (2026-11-04)
 
 - `data_paths.py` behoudt legacygedrag wanneer `active-version.json` ontbreekt. Met manifest resolveert het uitsluitend de negen versioned CSV-bestanden naar `versions/<active_version>/`; niet-versioned legacybronnen en scorebladen blijven in de datastore-root.
-- Ongeldig JSON/schema, ongeldige of ontbrekende versiemap, een versie buiten de datastore en ontbrekende versioned bestanden stoppen expliciet; versie-ID wordt niet als padfragment geaccepteerd.
-- Gerichte resolver- en stagingtests geslaagd; de volledige pytest-suite slaagde (`80 passed`). F3-28 is hiermee gedeeltelijk afgedekt. Dit is nog geen activatiecommando en de app/generator zijn nog niet omgezet naar ID-schema's.
-- **Nog open:** backup, atomische manifestwisseling, procesonderbreking, startup-schema-/referentiecontrole en rollback; uitsluitend tijdelijke fixtures.
+- `versioned_data.py` valideert alle negen schemas, ID-formaten, aliassen en CSV-referenties. Ongeldig JSON/schema, ongeldige of ontbrekende versie, ontbrekende bestanden en referentiefouten stoppen expliciet.
+- `data_versions.py` maakt een unieke full-backup en controleert die op bestands-hashes; activatie bouwt de versie onder `versions/` en gebruikt een atomische manifest-replace. Foutinjectie vóór replace bevestigt dat de oude legacyversie actief blijft.
+- Rollback is getest naar legacydata; wijzigingen na activering worden met rij-aantallen gemeld en rollback weigert zonder `confirm_data_loss`. Een geverifieerde backup wordt ook vóór rollback gemaakt.
+- De schrijfbare app en snapshotgenerator weigeren ID-data zolang hun naamgebaseerde adapter nog actief is. Geen productie- of NAS-data gebruikt.
+- **Nog open:** Docker-startup, foutinjectie tijdens installatiekopie, rollback naar een vorige ID-versie en Fase 4-adapterintegratie; uitsluitend tijdelijke fixtures.
 
 ### Mobiele UI-feedback (2026-11-04)
 

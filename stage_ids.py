@@ -21,27 +21,7 @@ from manillen_core.reference_helpers import (
 )
 from migrate_ids import _source_hashes, calculate_proposal_hash
 from profile_data import CSV_SCHEMAS
-
-
-VERSIONED_SCHEMAS = {
-    "players.csv": ("PlayerID", "Name", "PoolMember", "Active"),
-    "player_aliases.csv": ("Alias", "PlayerID", "Source"),
-    "locations.csv": ("LocationID", "Name", "Active"),
-    "location_aliases.csv": ("Alias", "LocationID", "Source"),
-    "pairings.csv": ("Player1", "Player2", "Count"),
-    "pairings_history.csv": ("Date", "Table", "Players", "Season", "Location"),
-    "scores_history.csv": (
-        "Date",
-        "Table",
-        "Game",
-        "Team1Players",
-        "Team2Players",
-        "Team1Score",
-        "Team2Score",
-    ),
-    "reserve_assignments.csv": ("Date", "Slot", "PlayerID"),
-    "seasons.csv": ("Season", "SeasonNumber", "SeasonStartYear", "Status"),
-}
+from versioned_data import VERSIONED_SCHEMAS, validate_version_directory
 _ID_PATTERNS = {
     "PlayerID": re.compile(rf"^plr_[{re.escape(ID_ALPHABET)}]{{5}}$"),
     "LocationID": re.compile(rf"^loc_[{re.escape(ID_ALPHABET)}]{{5}}$"),

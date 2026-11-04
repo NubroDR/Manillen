@@ -6,7 +6,7 @@ from pathlib import Path
 
 from shiny import App, Inputs, Outputs, Session, reactive, render, ui
 
-from data_paths import DATA_DIR
+from data_paths import DATA_DIR, assert_legacy_data_compatible
 from manillen_functions import (
     create_player_pool,
     delete_pairings_by_date,
@@ -65,6 +65,7 @@ SEASONS_FILE = DATA_DIR / "seasons.csv"
 LEGACY_SEASONS_FILE = DATA_DIR / "seasons_history.csv"
 LEGACY_PLAYDAYS_FILE = DATA_DIR / "seasons_playdays_legacy.csv"
 RESERVE_ASSIGNMENTS_FILE = DEFAULT_ASSIGNMENTS_FILE
+assert_legacy_data_compatible(DATA_DIR)
 ensure_season_data(DATA_DIR)
 APP_CSS = (BASE_DIR / "www" / "manillen.css").read_text(encoding="utf-8")
 
