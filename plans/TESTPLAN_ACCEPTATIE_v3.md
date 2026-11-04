@@ -18,7 +18,28 @@
 - Gedeelde historie-/locatie-/seizoensspeeldaghelpers, pairing-update/verwijdering en Excelgeneratie zijn op ID-fixtures getest. De tests controleren zichtbare namen in de historie en scorebladen, reservekoppeling, locatie, seizoenaanwezigheid en behoud van pair-counts en ID-opslag na update/verwijdering.
 - Gerichte validatie: `.venv\Scripts\python.exe -m pytest -q tests\test_reference_adapter.py tests\test_season_helpers.py tests\test_reserve_assignments.py tests\test_score_functions.py` — `39 passed`.
 - Alleen tijdelijke fixtures gebruikt; geen echte datastore aangeraakt, geen migratie toegepast en geen GitHub-publicatie gestart. De generator en lokale JSON-archiefopbouw exporteren geen IDs. Snapshot-/archieftests: `19 passed`; volledige regressiesuite na de generatorwijziging: `.venv\Scripts\python.exe -m pytest -q` — `99 passed`; `compileall` en `git diff --check` slaagden. F4-acceptatietests zijn nog niet volledig uitgevoerd.
-- **Volgende stap:** voltooi de resterende F4-pariteits- en deploymentacceptatie, waaronder NAS-startup en GitHub-upload/workflowdispatch op veilige fixtures; productieactivatie blijft geblokkeerd.
+- **Volgende stap:** voltooi de resterende F4-pariteitsacceptatie en voer een Docker-imagebuild uit waar Docker beschikbaar is; productieactivatie blijft geblokkeerd.
+
+### Voortgang Fase 4 deployment-/rollbackvalidatie (2026-11-04)
+
+- `.venv\Scripts\python.exe -m pytest -q tests\test_deployment_startup.py` — `1 passed`. Git Bash voerde de entrypoint op een tijdelijke datamap uit: bestaande `AllPlayers.csv` en `active-version.json` bleven onveranderd, een ontbrekende seed werd gekopieerd en de ingestelde `MANILLEN_DATA_DIR` werd gebruikt.
+- Gemockte publisher-/workflowtest op een actieve ID-fixture bevestigt volgorde GET → PUT → POST, uitsluitend JSON-bestanden in het archief, geen `plr_`-/`loc_`-referenties en geen wijzigingen aan de brondata. Bestaande rollbacktests bevestigen terugschakelen naar legacy en vereisen expliciete toestemming bij latere datawijzigingen.
+- Volledige regressiesuite: `.venv\Scripts\python.exe -m pytest -q` — `101 passed`; `compileall` en `git diff --check` geslaagd. Geen echte data, GitHub-API, NAS of productie geraakt.
+- Docker-engine is niet beschikbaar in deze omgeving; imagebuild is niet uitgevoerd. Resterend: F4-pariteitsacceptatie en containerbuild op een Docker-host. Geen echte migratie, upload of dispatch zonder expliciete goedkeuring.
+
+### Voortgang Fase 4 snapshot-pariteit (2026-11-04)
+
+- `tests\test_static_snapshot.py::test_snapshot_matches_legacy_output_after_id_version_activation` bouwt met uitsluitend `tmp_path` dezelfde fixture eerst als legacydata en daarna na goedgekeurde ID-staging/activatie; manifest en alle JSON-bestanden moeten exact gelijk zijn.
+- De test vond een verschil in de volgorde van de twee partners: de actieve ID-opslag sorteerde op IDs, terwijl de publieke uitvoer namen bevat. `generate_static_snapshot.py` sorteert daarom elk paar op zichtbare naam voordat het de partnerregels sorteert.
+- Gerichte validatie: `.venv\Scripts\python.exe -m pytest -q tests\test_static_snapshot.py` — `17 passed`. Volledige regressiesuite: `.venv\Scripts\python.exe -m pytest -q` — `102 passed`; `compileall` en `git diff --check` geslaagd. Alleen tijdelijke fixtures gebruikt; geen migratie op echte data of publicatie uitgevoerd.
+- Docker-engine/imagebuild, echte GitHub-/NAS-publicatie en expliciete productieacceptatie blijven open. Productieactivatie blijft geblokkeerd.
+
+### Voortgang Fase 4 naamwijziging (2026-11-04)
+
+- `rename_player.py` werkt alleen op een actieve ID-dataset waarvan de actuele bestandshashes overeenkomen met het manifest. Het maakt een nieuwe versie met ongewijzigde PlayerID's, bewaart de oude naam als `Source=rename`-alias, valideert de versie, maakt via het bestaande activatiepad een geverifieerde backup en wisselt atomisch.
+- Tijdelijke-fixturetest dekt naamresolutie in app en nieuw Excel, historische ID's, ongewijzigde oude Excel en oude én nieuwe profiel-URL's na snapshotregeneratie; de vorige versie blijft byte-identiek. Een conflictnaam wordt vóór backup of mutatie geweigerd.
+- Gerichte renamevalidatie: beide rename-regressietests — `2 passed`; adapter-/snapshottests — `30 passed`; volledige regressiesuite: `.venv\Scripts\python.exe -m pytest -q` — `104 passed`. Syntaxiscontrole, CLI-help en `git diff --check` slagen.
+- Dit voltooit niet de volledige Fase 4-acceptatie: GUI-/alle-tabbladen HTML-scan, resterende naamwijzigings-/aliasacceptatie en Docker-imagebuild moeten nog worden gevalideerd. Geen echte datastore, GitHub, NAS of productie gebruikt.
 
 ### Uitvoeringsstatus Fase 0 (2026-10-25)
 

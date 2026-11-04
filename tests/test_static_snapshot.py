@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from build_static_site import build_site, build_site_from_archive
+from data_versions import activate_staged_version
 from github_publish import (
     SNAPSHOT_ARCHIVE,
     GitHubPublishError,
@@ -18,12 +19,14 @@ from github_publish import (
     trigger_mirror_workflow,
 )
 from generate_static_snapshot import build_snapshot, generate_snapshot
+from migrate_ids import build_id_proposal, calculate_proposal_hash
 from manillen_core.data_helpers import load_pairing_counts, load_reserve_assignments
 from manillen_core.score_helpers import compute_standings, load_scores
 from manillen_core.season_helpers import (
     compute_closed_season_awards,
     compute_hall_of_fame,
 )
+from stage_ids import stage_id_migration
 
 
 def write_csv(path, fieldnames, rows):
@@ -390,6 +393,43 @@ def test_snapshot_pairings_and_legacy_shared_bronze_match_helpers(tmp_path):
     bronze = next(row for row in hall_of_fame if row["Player"] == "Gilbert")
     bronze_peer = next(row for row in hall_of_fame if row["Player"] == "Matthias")
     assert bronze["Bronze"] == bronze_peer["Bronze"] == 1
+
+
+def test_snapshot_matches_legacy_output_after_id_version_activation(tmp_path):
+    data_dir = tmp_path / "data"
+    make_snapshot_fixture(data_dir)
+    legacy_manifest, legacy_files = build_snapshot(data_dir)
+
+    proposal = build_id_proposal(data_dir)
+    for player in proposal["players"]:
+        player["Active"] = 1
+    for location in proposal["locations"]:
+        location["Active"] = 1
+    proposal["proposal_sha256"] = calculate_proposal_hash(proposal)
+    review_dir = tmp_path / "private-review"
+    review_dir.mkdir()
+    proposal_path = review_dir / "proposal.json"
+    proposal_path.write_text(
+        json.dumps(proposal, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    approval_path = review_dir / "approval.json"
+    approval_path.write_text(json.dumps({
+        "status": "approved",
+        "proposal_sha256": proposal["proposal_sha256"],
+        "approved_by": "test reviewer",
+        "approved_at": "2026-11-04T10:00:00+01:00",
+    }), encoding="utf-8")
+    staging_dir = tmp_path / "staging"
+    stage_id_migration(data_dir, proposal_path, approval_path, staging_dir)
+    backup_parent = tmp_path / "backups"
+    backup_parent.mkdir()
+    activate_staged_version(data_dir, staging_dir, backup_parent / "activation")
+
+    id_manifest, id_files = build_snapshot(data_dir)
+
+    assert id_manifest == legacy_manifest
+    assert id_files == legacy_files
 
 
 def test_snapshot_is_deterministic_json_only_and_never_changes_source(tmp_path):

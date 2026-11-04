@@ -1,4 +1,6 @@
+import base64
 import csv
+import hashlib
 import io
 import json
 import os
@@ -10,9 +12,13 @@ from pathlib import Path
 import pytest
 from openpyxl import Workbook, load_workbook
 
-from data_paths import VERSIONED_FILES
+from data_paths import VERSIONED_FILES, active_data_dir
 from generate_static_snapshot import build_snapshot
-from github_publish import _snapshot_archive_bytes
+from github_publish import (
+    SNAPSHOT_ARCHIVE,
+    _snapshot_archive_bytes,
+    trigger_mirror_workflow,
+)
 from manillen_functions import (
     _load_pairings_history,
     delete_pairings_by_date,
@@ -32,6 +38,7 @@ from manillen_core.data_helpers import (
 from reserve_assignments import get_reserve_assignments, save_reserve_assignments
 from score_functions import compute_standings, load_scores, save_game_score
 from manillen_core.season_helpers import load_season_playdays
+from rename_player import rename_player
 from versioned_data import VERSIONED_SCHEMAS
 
 
@@ -89,6 +96,12 @@ def _activate_version(data_root):
     (data_root / "active-version.json").write_text(json.dumps({
         "manifest_version": 1,
         "active_version": version_id,
+        "files": {
+            filename: hashlib.sha256(
+                (version_dir / filename).read_bytes()
+            ).hexdigest()
+            for filename in VERSIONED_FILES
+        },
     }), encoding="utf-8")
     return version_dir
 
@@ -435,6 +448,86 @@ def test_versioned_snapshot_exports_display_names_not_ids(tmp_path):
     )
 
 
+def test_versioned_publisher_uploads_name_only_archive_before_dispatch(
+    tmp_path,
+    monkeypatch,
+):
+    data_root = tmp_path / "store"
+    data_root.mkdir()
+    version_dir = _activate_version(data_root)
+    update_pairs_in_csv(
+        [("An", "Bruno", "José", "Reserve 1")],
+        version_dir / "pairings.csv",
+        history_filename=version_dir / "pairings_history.csv",
+        play_date="2026-10-11",
+        location="Gent",
+    )
+    before = {
+        path.relative_to(data_root): path.read_bytes()
+        for path in data_root.rglob("*")
+        if path.is_file()
+    }
+    calls = []
+
+    def fake_request_json(request, allow_not_found=False):
+        method = request.get_method()
+        calls.append(method)
+        if method == "GET":
+            assert allow_not_found
+            assert request.full_url.endswith(f"/{SNAPSHOT_ARCHIVE}?ref=main")
+            return 404, {}
+        assert method == "PUT"
+        payload = json.loads(request.data)
+        with zipfile.ZipFile(
+            io.BytesIO(base64.b64decode(payload["content"]))
+        ) as archive:
+            members = archive.namelist()
+            assert all(member.endswith(".json") for member in members)
+            contents = [
+                archive.read(member).decode("utf-8")
+                for member in members
+            ]
+        assert all(
+            "plr_" not in content and "loc_" not in content
+            for content in contents
+        )
+        return 201, {}
+
+    class DispatchResponse:
+        status = 204
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+    def fake_urlopen(request, timeout):
+        calls.append(request.get_method())
+        assert timeout == 15
+        assert request.full_url.endswith(
+            "/actions/workflows/publish-mirror.yml/dispatches"
+        )
+        return DispatchResponse()
+
+    monkeypatch.setenv("GITHUB_TOKEN", "test-token")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "example/manillen")
+    monkeypatch.setenv("GITHUB_WORKFLOW", "publish-mirror.yml")
+    monkeypatch.setenv("GITHUB_REF", "main")
+    monkeypatch.setattr("github_publish._request_json", fake_request_json)
+    monkeypatch.setattr("github_publish.urlopen", fake_urlopen)
+
+    trigger_mirror_workflow(data_root)
+
+    after = {
+        path.relative_to(data_root): path.read_bytes()
+        for path in data_root.rglob("*")
+        if path.is_file()
+    }
+    assert calls == ["GET", "PUT", "POST"]
+    assert after == before
+
+
 def test_app_starts_with_active_id_version_and_displays_names(tmp_path):
     data_root = tmp_path / "store"
     data_root.mkdir()
@@ -475,3 +568,108 @@ def test_app_starts_with_active_id_version_and_displays_names(tmp_path):
         },
         "locations": {"Gent": "Gent"},
     }
+
+
+def test_offline_player_rename_preserves_id_history_excel_and_old_profile_url(
+    tmp_path,
+):
+    data_root = tmp_path / "store"
+    data_root.mkdir()
+    old_version = _activate_version(data_root)
+    excel_dir = data_root / "Scorebladen"
+    excel_dir.mkdir()
+    old_excel = excel_dir / "2026-10-10.xlsx"
+    old_excel.write_bytes(b"existing workbook")
+    backup_parent = tmp_path / "backups"
+    backup_parent.mkdir()
+
+    before_snapshot = build_snapshot(data_root)[1]
+    old_player_bytes = (old_version / "players.csv").read_bytes()
+    result = rename_player(
+        data_root,
+        "plr_abcde",
+        "Anne",
+        backup_parent / "before-rename",
+    )
+
+    adapter = ReferenceAdapter(data_root)
+    active_version = active_data_dir(data_root)
+    _, renamed_snapshot = build_snapshot(data_root)
+    with (active_version / "player_aliases.csv").open(
+        "r", encoding="utf-8", newline=""
+    ) as file:
+        aliases = list(csv.DictReader(file))
+    template = tmp_path / "template.xlsx"
+    workbook = Workbook()
+    workbook.active.title = "Tafel 1"
+    for table in range(2, 5):
+        workbook.create_sheet(f"Tafel {table}")
+    workbook.save(template)
+    generated_excel = fill_scorebladen_from_history(
+        play_date="2026-10-10",
+        history_filename=active_version / "pairings_history.csv",
+        template_filename=template,
+        output_dir=tmp_path / "generated",
+    )
+    exported = load_workbook(generated_excel, data_only=True)
+    subprocess_result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import app, json; print(json.dumps(app.players, ensure_ascii=False))",
+        ],
+        cwd=Path(__file__).resolve().parents[1],
+        env={**os.environ, "MANILLEN_DATA_DIR": str(data_root)},
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    assert result["player_id"] == "plr_abcde"
+    assert result["old_name"] == "An"
+    assert result["new_name"] == "Anne"
+    assert result["manifest"]["previous_version"] == "v_test123"
+    assert adapter.player_id("An") == adapter.player_id("Anne") == "plr_abcde"
+    assert adapter.player_name("plr_abcde") == "Anne"
+    assert (old_version / "players.csv").read_bytes() == old_player_bytes
+    assert old_excel.read_bytes() == b"existing workbook"
+    assert exported["Tafel 1"]["B10"].value == "Anne"
+    assert any(
+        row["Alias"] == "An"
+        and row["PlayerID"] == "plr_abcde"
+        and row["Source"] == "rename"
+        for row in aliases
+    )
+    assert before_snapshot["players/an.json"]["name"] == "An"
+    assert renamed_snapshot["players/anne.json"]["name"] == "Anne"
+    assert renamed_snapshot["players/an.json"]["name"] == "Anne"
+    assert json.loads(subprocess_result.stdout.strip().splitlines()[-1])[0] == "Anne"
+
+
+def test_offline_player_rename_rejects_conflicting_name_without_changing_data(
+    tmp_path,
+):
+    data_root = tmp_path / "store"
+    data_root.mkdir()
+    version_dir = _activate_version(data_root)
+    before = {
+        path.relative_to(data_root): path.read_bytes()
+        for path in data_root.rglob("*")
+        if path.is_file()
+    }
+
+    with pytest.raises(ValueError, match="already assigned"):
+        rename_player(
+            data_root,
+            "plr_abcde",
+            "Bruno",
+            tmp_path / "backups" / "must-not-exist",
+        )
+
+    after = {
+        path.relative_to(data_root): path.read_bytes()
+        for path in data_root.rglob("*")
+        if path.is_file()
+    }
+    assert after == before
+    assert not (tmp_path / "backups").exists()

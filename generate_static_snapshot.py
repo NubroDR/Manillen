@@ -1,6 +1,7 @@
 """Generate a versioned, derived JSON snapshot for the static public mirror."""
 
 import argparse
+import csv
 import hashlib
 import json
 import re
@@ -431,10 +432,17 @@ def build_snapshot(data_dir):
             ),
         })
 
-    partner_rows = [
-        {"player1": player1, "player2": player2, "count": count}
-        for player1, player2, count in load_pairing_counts(str(pairings_path))
-    ]
+    partner_rows = []
+    for player1, player2, count in load_pairing_counts(str(pairings_path)):
+        player1, player2 = sorted(
+            (player1, player2),
+            key=str.casefold,
+        )
+        partner_rows.append({
+            "player1": player1,
+            "player2": player2,
+            "count": count,
+        })
     partner_rows.sort(
         key=lambda row: (
             -row["count"],
@@ -467,8 +475,16 @@ def build_snapshot(data_dir):
         "pairings.json": partner_rows,
         "hall-of-fame.json": hall_of_fame,
     }
+    profiles_by_id = {}
+    profile_slugs = {}
     for player in players:
-        files[f"players/{_player_slug(player)}.json"] = _player_profile(
+        player_id = adapter.player_id(player)
+        profile_path = _player_slug(player)
+        existing_id = profile_slugs.get(profile_path)
+        if existing_id is not None and existing_id != player_id:
+            raise ValueError(f"Player profile slug collision: {profile_path}")
+        profile_slugs[profile_path] = player_id
+        profiles_by_id[player_id] = _player_profile(
             player,
             season_by_date,
             hall_of_fame,
@@ -476,6 +492,24 @@ def build_snapshot(data_dir):
             all_history,
             assignments,
         )
+        files[f"players/{profile_path}.json"] = profiles_by_id[player_id]
+    if adapter.is_versioned:
+        aliases_path = adapter.data_dir / "player_aliases.csv"
+        with aliases_path.open("r", encoding="utf-8-sig", newline="") as file:
+            for row in csv.DictReader(file):
+                if row.get("Source") != "rename":
+                    continue
+                player_id = row["PlayerID"]
+                if player_id not in profiles_by_id:
+                    continue
+                profile_path = _player_slug(row["Alias"])
+                existing_id = profile_slugs.get(profile_path)
+                if existing_id is not None and existing_id != player_id:
+                    raise ValueError(
+                        f"Player profile slug collision: {profile_path}"
+                    )
+                profile_slugs[profile_path] = player_id
+                files[f"players/{profile_path}.json"] = profiles_by_id[player_id]
     for label, payload in season_payloads.items():
         files[f"seasons/{_season_key(label)}.json"] = payload
     files["seasons/all.json"] = all_season_payload

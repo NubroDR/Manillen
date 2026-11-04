@@ -58,7 +58,7 @@ Kortom: als een wijziging "groot" is, dan is een README-update verplicht. Als ee
 ├── requirements-dev.txt      # pytest en de runtime-dependencies voor tests.
 ├── Dockerfile                # Image voor de volledige NAS-app.
 ├── docker-compose.yml        # Portainer Stack-configuratie.
-├── docker-entrypoint.sh      # Seedt een leeg /app/data-volume.
+├── docker-entrypoint.sh      # Seedt ontbrekende bestanden in MANILLEN_DATA_DIR of /app/data.
 ├── .dockerignore             # Beperkt de Docker build context.
 ├── publish_mirror.py         # Bouwt de statische mirror uit CSV-data of een JSON-archief.
 ├── generate_static_snapshot.py # Afgeleide JSON voor de nieuwe statische mirror.
@@ -67,6 +67,7 @@ Kortom: als een wijziging "groot" is, dan is een README-update verplicht. Als ee
 ├── stage_ids.py              # Bouwt een gevalideerde, inactieve ID-stagingversie.
 ├── versioned_data.py         # Schema- en referentievalidatie voor ID-datasets.
 ├── data_versions.py          # Full backup, atomische activering en rollback.
+├── rename_player.py          # Offline spelersnaam wijzigen met behoud van PlayerID.
 ├── site/                     # Bronbestanden van de nieuwe vanilla-JS preview.
 ├── static_snapshot.zip       # JSON-only invoerarchief voor de handmatige Pages-workflow.
 ├── data/
@@ -170,6 +171,17 @@ python data_versions.py rollback --data-dir "<testdatastore>" `
 
 De backup is een unieke, geverifieerde kopie van de volledige datastore. Activering kopieert een gevalideerde stagingversie naar `versions/` en wijzigt daarna alleen `active-version.json` via een tijdelijke file en atomische replace; vóór die replace blijft de vorige versie actief. Rollback weigert standaard als bestanden sinds activering zijn veranderd en rapporteert de rij-aantallen; `--confirm-data-loss` is vereist om die wijzigingen bewust te laten vallen. Oude versies worden nooit verwijderd.
 
+Een speler hernoemen kan alleen met een actieve, ongewijzigde ID-versie. Het offline commando maakt een nieuwe versie, bewaart de oude naam als alias, maakt eerst een volledige externe backup en activeert daarna atomisch. PlayerID en historische verwijzingen blijven gelijk; reeds gegenereerde Excelbestanden worden niet aangepast. De snapshotgenerator houdt profiel-URLs op basis van de oude naam beschikbaar:
+
+```powershell
+python rename_player.py --data-dir "<testdatastore>" `
+  --player-id "plr_abcde" `
+  --new-name "Nieuwe naam" `
+  --backup-output "<nieuwe externe backupmap>"
+```
+
+De backupmap moet nog niet bestaan en buiten de datastore en repository liggen. Controleer de nieuwe versie en genereer daarna de publieke snapshot opnieuw; voer dit commando uitsluitend op een tijdelijke testdatastore uit totdat de volledige Fase 4-acceptatie en aparte productiegoedkeuring zijn afgerond.
+
 **Niet op de echte NAS-datastore toepassen.** De hoofdapp, scorebladexport en snapshot-/archiefopbouw zijn op tijdelijke fixtures met een actieve ID-versie getest, maar de volledige Fase 4-acceptatie en productievalidatie zijn nog open. Productieactivatie blijft geblokkeerd totdat de volledige regressie- en acceptatiesuite, deployment-/rollbackcontrole en aparte migratiegoedkeuring gereed zijn. Gebruik deze commando's nu alleen met tijdelijke testdata.
 
 ## Statische mirror-preview (preview live; productiecutover open)
@@ -199,6 +211,8 @@ In de tussenstand worden spelers eerst gesorteerd op gewonnen spellen, daarna op
 `data/seasons.csv` is het register van tool-seizoenen met uitsluitend `Season`, `SeasonNumber`, `SeasonStartYear` en `Status`. Een nieuwe speeldag krijgt standaard het actieve seizoen, maar het seizoen is vóór het bewaren te kiezen. `pairings_history.csv` bewaart `Season` en `Location` per tafelrij; oude bestanden krijgen deze kolommen veilig toegevoegd en een ontbrekend seizoen wordt als `2026-2027` gelezen. De locatie is te kiezen uit eerder gebruikte locaties of als nieuwe locatie in te voeren, en verschijnt op de tabbladen **Speeldagen** en **Seizoenen**.
 
 Bij de eerste migratie wordt vóór wijziging van `pairings_history.csv` verplicht één backup gemaakt als `pairings_history.csv.bak-pre-seasons`; een bestaande backup wordt nooit overschreven. De migratie schrijft eerst naar een tijdelijk bestand en vervangt het origineel alleen na een geslaagde write. De startup kopieert ontbrekende seedbestanden naar `/app/data`, maar vervangt geen bestaande bestanden.
+
+De Docker-entrypoint seedt alleen bestanden die ontbreken in `MANILLEN_DATA_DIR` (standaard `/app/data`); bestaande bestanden en versiebestanden worden niet overschreven. Zonder `MANILLEN_DATA_DIR` is de standaard NAS-mount via Compose `/app/data`.
 
 **Maak vóór de eerste redeploy handmatig een volledige kopie van `/volume1/manillen_data` naar een veilige backup-locatie.** De automatische historybackup is aanvullend en vervangt deze NAS-backup niet.
 
